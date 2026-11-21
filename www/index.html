@@ -19,6 +19,7 @@
 <header id="topbar">
   <div id="gpsChip" class="chip"><span class="dot"></span><span id="gpsText">GPS…</span></div>
   <div id="farmTitle" class="title"></div>
+  <div id="recChip" class="chip rec hidden"><span class="recDot"></span><span id="recText">REC</span></div>
   <button id="btnLang" class="chip btn-chip">PT</button>
   <button id="btnMenu" class="chip btn-chip" aria-label="menu">☰</button>
 </header>
@@ -67,6 +68,13 @@
 
   <div class="pane" data-pane="gps">
     <div class="avgBox">
+      <div class="avgVis">
+        <div class="ringWrap">
+          <svg viewBox="0 0 120 120" class="ring"><circle cx="60" cy="60" r="52" class="ringBg"/><circle id="ringFg" cx="60" cy="60" r="52" class="ringFg"/></svg>
+          <div class="ringTxt"><b id="ringAcc">—</b><span id="ringSub">m</span></div>
+        </div>
+        <canvas id="avgScatter" width="240" height="240"></canvas>
+      </div>
       <div id="avgStatus" class="mono">—</div>
       <div class="row">
         <button id="btnAvg" class="btn primary" data-i18n="startAvg"></button>
@@ -86,12 +94,25 @@
       <label><span data-i18n="distance"></span><input id="inDist" type="number" inputmode="decimal" step="1" min="0"></label>
     </div>
     <div class="row">
-      <button id="btnCompass" class="btn" data-i18n="useCompass"></button>
-      <span id="compassLive" class="mono"></span>
+      <div class="rose">
+        <svg viewBox="0 0 100 100">
+          <circle cx="50" cy="50" r="46" class="roseBg"/>
+          <g class="roseTicks"></g>
+          <text x="50" y="14" class="roseN">N</text>
+          <g id="roseArrow"><path d="M50 12 L57 50 L50 44 L43 50 Z" class="arrowTarget"/></g>
+          <g id="roseLive" class="hidden"><path d="M50 18 L53 50 L47 50 Z" class="arrowLive"/></g>
+        </svg>
+      </div>
+      <div class="col">
+        <button id="btnCompass" class="btn" data-i18n="useCompass"></button>
+        <span id="compassLive" class="mono"></span>
+      </div>
     </div>
     <div id="bearingStatus" class="mono"></div>
   </div>
 
+  <div id="accWarn" class="warn hidden"></div>
+  <div id="dupWarn" class="warn hidden"></div>
   <div class="grid2">
     <label><span data-i18n="height"></span><input id="inHeight" type="number" inputmode="decimal" step="0.5" min="0"></label>
     <label><span data-i18n="width"></span><input id="inWidth" type="number" inputmode="decimal" step="0.5" min="0"></label>
@@ -123,7 +144,8 @@
     <button id="btnNew" class="btn danger" data-i18n="newSession"></button>
   </div>
   <div id="stats" class="mono muted"></div>
-  <p class="muted small">Field Scout v1.0 · Pyka mapping Step 4</p>
+  <div id="statsBars" class="bars"></div>
+  <p class="muted small">Field Scout v1.1 · Pyka mapping Step 4</p>
 </section>
 
 <!-- List sheet -->
@@ -133,6 +155,7 @@
 </section>
 
 <div id="toast" class="hidden"></div>
+<div id="flash" class="hidden"><div class="flashIc">✓</div><div id="flashTxt"></div></div>
 
 <script src="vendor/leaflet.js"></script>
 <script src="vendor/turf.min.js"></script>

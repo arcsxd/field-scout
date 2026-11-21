@@ -33,7 +33,9 @@ const I18N = {
     inSpray:'inside spray area', inBuffer:'within 1.5 km', outside:'beyond 1.5 km',
     compassDenied:'Compass not available', exportEmpty:'Nothing to export',
     noFix:'No GPS position yet', accuracy:'acc', stats:'{p} obstacles · {l} lines · {t} track pts',
-    sheetTitleLine:'(line)', addToLine:'Added to line', untitled:'Untitled farm'
+    sheetTitleLine:'(line)', addToLine:'Added to line', untitled:'Untitled farm',
+    accGood:'✓ Good GPS accuracy', accMid:'⚠ Fair accuracy — average a bit longer', accPoor:'✖ Poor accuracy — wait, move to open sky or mark on map',
+    dupNear:'⚠ {type} already marked {d} m away — possible duplicate', fromLast:'from last pole', byType:'By type', lineKm:'Lines', trackKm:'Track'
   },
   pt: {
     pole:'Poste', tower:'Torre', guy:'Âncora estai', silo:'Silo', building:'Edificação',
@@ -63,7 +65,9 @@ const I18N = {
     inSpray:'dentro da área', inBuffer:'até 1,5 km', outside:'além de 1,5 km',
     compassDenied:'Bússola indisponível', exportEmpty:'Nada para exportar',
     noFix:'Ainda sem posição GPS', accuracy:'prec', stats:'{p} obstáculos · {l} linhas · {t} pts de trilha',
-    sheetTitleLine:'(linha)', addToLine:'Adicionado à linha', untitled:'Fazenda sem nome'
+    sheetTitleLine:'(linha)', addToLine:'Adicionado à linha', untitled:'Fazenda sem nome',
+    accGood:'✓ Precisão do GPS boa', accMid:'⚠ Precisão razoável — faça a média por mais tempo', accPoor:'✖ Precisão ruim — aguarde, vá para céu aberto ou marque no mapa',
+    dupNear:'⚠ {type} já marcado a {d} m — possível duplicado', fromLast:'do último poste', byType:'Por tipo', lineKm:'Linhas', trackKm:'Trilha'
   }
 };
 // Export labels are always English (for the Pyka team)
@@ -196,6 +200,7 @@ function onPos(p) {
   dot.className = 'dot ' + (fix.acc <= 5 ? 'good' : fix.acc <= 15 ? 'mid' : 'bad');
   $('#gpsText').textContent = `±${fmt(fix.acc, 0)} m`;
   fixListeners.forEach(f => f(fix));
+  updateBand(); updateRec();
   if (tracking && !nativeBg) addTrackPoint(fix);
 }
 function onPosErr(e) { $('#gpsText').textContent = t('gpsNone'); $('#gpsChip .dot').className = 'dot bad'; console.warn(e); }
@@ -213,6 +218,7 @@ function addTrackPoint(f) {
   if (last && (f.ts - last[2] < 2000)) return;
   if (last && turf.distance([last[1], last[0]], [f.lon, f.lat], { units: 'meters' }) < 4) return;
   if (f.acc > 30) return;
+  if (last) trackStats.m += turf.distance([last[1], last[0]], [f.lon, f.lat], { units: 'meters' });
   S.track.push([+f.lat.toFixed(7), +f.lon.toFixed(7), f.ts, Math.round(f.acc)]);
   trackLine.addLatLng([f.lat, f.lon]);
   persist();
@@ -220,7 +226,8 @@ function addTrackPoint(f) {
 async function setTracking(on) {
   tracking = on;
   $('#btnTrack').classList.toggle('on', on);
-  if (on) S.track.push(null); // segment break marker
+  if (on) { S.track.push(null); trackStats.start = Date.now(); } // segment break marker
+  $('#recChip').classList.toggle('hidden', !on); updateRec();
   if (isNative && Cap.Plugins && Cap.Plugins.BackgroundGeolocation) {
     nativeBg = Cap.Plugins.BackgroundGeolocation;
     if (on) {
@@ -399,7 +406,7 @@ function finishLine(cancel = false) {
     // points stay as standalone obstacles; just unlink them
     S.features.forEach(f => { if (f.lineId === lineMode.id) delete f.lineId; });
   }
-  lineMode = null;
+  lineMode = null; gBand.clearLayers();
   $('#btnLine').classList.remove('on-line'); $('#lineBanner').classList.add('hidden');
   persist(); refreshAll();
 }
@@ -419,8 +426,9 @@ function openSheet(type, editing = null) {
   $('#avgStatus').textContent = editing ? `${editing.lat.toFixed(6)}, ${editing.lon.toFixed(6)} ±${fmt(editing.acc, 0)}m` : '—';
   $('#mapPickStatus').textContent = ''; $('#bearingStatus').textContent = '';
   $('#inBearing').value = ''; $('#inDist').value = '';
+  resetCaptureVisuals();
   renderThumbs(); setMethod(editing ? (editing.method.split('+')[0] || 'gps') : 'gps');
-  $('#sheet').classList.remove('hidden');
+  $('#sheet').classList.remove('hidden'); $('#lineBanner').classList.add('hidden');
   updateSaveBtn();
   // auto-start averaging for fast pole capture
   if (!editing) startAvg();
@@ -434,14 +442,14 @@ function setMethod(m) {
   if (m === 'bearing') prepBearing();
 }
 function updateSaveBtn() { $('#btnSave').disabled = !(cap && cap.pos); }
-function closeAllSheets() { ['#sheet', '#menu', '#list'].forEach(s => $(s).classList.add('hidden')); stopAvg(); stopCompass(); cancelTapPick(); }
+function closeAllSheets() { ['#sheet', '#menu', '#list'].forEach(s => $(s).classList.add('hidden')); if (lineMode) $('#lineBanner').classList.remove('hidden'); stopAvg(); stopCompass(); cancelTapPick(); clearPreview(); }
 
 // GPS averaging (weighted by 1/acc²)
 let avg = null;
 function startAvg() {
   if (avg) return stopAvg();
   const secs = +$('#avgSecs').value || 10;
-  avg = { samples: [], end: Date.now() + secs * 1000 };
+  avg = { samples: [], end: Date.now() + secs * 1000, secs };
   $('#btnAvg').textContent = t('stopAvg');
   if (fix && Date.now() - fix.ts < 3000) avg.samples.push(fix);
   const listener = f => { avg && avg.samples.push(f); renderAvg(); };
@@ -460,11 +468,12 @@ function computeAvg(samples) {
 function renderAvg() {
   if (!avg) return;
   const left = Math.max(0, (avg.end - Date.now()) / 1000);
-  if (!avg.samples.length) { $('#avgStatus').textContent = `${t('noFix')} · ${left.toFixed(0)}s`; return; }
+  if (!avg.samples.length) { $('#avgStatus').textContent = `${t('noFix')} · ${left.toFixed(0)}s`; drawRing(1 - left / avg.secs, null); return; }
   const r = computeAvg(avg.samples);
   cap.pos = { lat: r.lat, lon: r.lon, acc: r.acc }; cap.method = 'gps';
-  $('#avgStatus').textContent = `${r.lat.toFixed(6)}, ${r.lon.toFixed(6)}\n±${fmt(r.acc)} m · ${avg.samples.length} ${t('samples')} · ${t('spread')} ${fmt(r.spread)} m · ${left.toFixed(0)}s`;
-  updateSaveBtn();
+  $('#avgStatus').textContent = `${r.lat.toFixed(6)}, ${r.lon.toFixed(6)}\n${avg.samples.length} ${t('samples')} · ${t('spread')} ${fmt(r.spread)} m · ${left.toFixed(0)}s`;
+  drawRing(1 - left / avg.secs, r.acc); drawScatter(avg.samples, r);
+  updateSaveBtn(); showPreview();
 }
 function stopAvg() {
   if (!avg) return;
@@ -490,7 +499,7 @@ map.on('click', () => {
   const c = map.getCenter();
   cap.pos = { lat: c.lat, lon: c.lng, acc: null }; cap.method = 'map';
   $('#mapPickStatus').textContent = `${c.lat.toFixed(6)}, ${c.lng.toFixed(6)} (z${map.getZoom()})`;
-  cancelTapPick(true); updateSaveBtn();
+  cancelTapPick(true); updateSaveBtn(); showPreview(true);
 });
 
 // Bearing + distance from current/averaged position
@@ -502,6 +511,7 @@ function onOrient(e) {
   if (h == null) return;
   compassHeading = (h + (+S.decl || 0) + 360) % 360;
   $('#compassLive').textContent = `${compassHeading.toFixed(0)}°`;
+  $('#roseLive').classList.remove('hidden'); setRose('#roseLive', compassHeading);
 }
 async function startCompass() {
   try {
@@ -530,6 +540,7 @@ function prepBearing() { bearingOrigin = fix ? { ...fix } : null; calcBearing();
 function calcBearing() {
   if (cap?.method !== 'bearing') return;
   const b = parseFloat($('#inBearing').value), d = parseFloat($('#inDist').value);
+  setRose('#roseArrow', isNaN(b) ? 0 : b);
   if (!bearingOrigin && fix) bearingOrigin = { ...fix };
   if (!bearingOrigin) { $('#bearingStatus').textContent = t('noFix'); return; }
   if (isNaN(b) || isNaN(d)) { $('#bearingStatus').textContent = `${t('accuracy')} ±${fmt(bearingOrigin.acc, 0)} m`; cap.pos = null; updateSaveBtn(); return; }
@@ -539,7 +550,7 @@ function calcBearing() {
   const acc = bearingOrigin.acc + d * Math.tan(5 * Math.PI / 180);
   cap.pos = { lat, lon, acc, from: [bearingOrigin.lat, bearingOrigin.lon], bearing: b, dist: d };
   $('#bearingStatus').textContent = `${lat.toFixed(6)}, ${lon.toFixed(6)} ±${fmt(acc, 0)} m`;
-  updateSaveBtn();
+  updateSaveBtn(); showPreview(true);
 }
 
 // Photos (resized to max 1600 px, JPEG)
@@ -585,9 +596,11 @@ async function saveCapture() {
     if (lineMode) { f.lineId = lineMode.id; lineMode.pointIds.push(f.id); }
     S.features.push(f); S.undo.push({ op: 'add', id: f.id });
   }
+  const savedPos = { lat: data.lat, lon: data.lon }, savedType = cap.type, wasEdit = !!cap.editing, newId = wasEdit ? cap.editing.id : S.features[S.features.length - 1].id;
   persist(); closeAllSheets(); refreshAll(); updateLineBanner();
+  celebrate(savedPos, savedType, wasEdit ? null : newId);
+  if (lineMode && fix) map.panTo([fix.lat, fix.lon]);
   toast(lineMode && !cap.editing ? `${t('addToLine')} (${lineMode.pointIds.length})` : t('saved'));
-  if (navigator.vibrate) navigator.vibrate(40);
   cap = null;
 }
 
@@ -684,6 +697,7 @@ async function exportCsv() {
 
 // ---------------------------------------------------------------- list + stats
 function updateStats() {
+  drawBars();
   $('#stats').textContent = t('stats').replace('{p}', S.features.length).replace('{l}', S.lines.length).replace('{t}', S.track.filter(Boolean).length);
 }
 function openList() {
@@ -699,6 +713,146 @@ function openList() {
   $('#list').classList.remove('hidden');
 }
 
+
+// ---------------------------------------------------------------- visual feedback
+const trackStats = { m: 0, start: 0 };
+const gPreview = L.layerGroup().addTo(map);
+const gBand = L.layerGroup().addTo(map);
+function haptic(kind = 'MEDIUM') {
+  try { if (isNative && Cap.Plugins?.Haptics) return Cap.Plugins.Haptics.impact({ style: kind }); } catch {}
+  if (navigator.vibrate) navigator.vibrate(kind === 'HEAVY' ? [30, 40, 30] : 25);
+}
+const accClass = a => a == null ? '' : a <= 5 ? 'green' : a <= 12 ? 'orange' : 'red';
+const accColor = a => ({ green: '#2fd27a', orange: '#ffb020', red: '#ff4d4f' })[accClass(a)] || '#3ea6ff';
+
+function resetCaptureVisuals() {
+  drawRing(0, null);
+  const c = $('#avgScatter'); c.getContext('2d').clearRect(0, 0, c.width, c.height);
+  $('#accWarn').classList.add('hidden'); $('#dupWarn').classList.add('hidden');
+  $('#roseLive').classList.add('hidden'); setRose('#roseArrow', 0);
+  if (cap) cap.panned = false;
+}
+function drawRing(frac, acc) {
+  const C = 2 * Math.PI * 52, fg = $('#ringFg');
+  fg.style.strokeDashoffset = C * (1 - Math.max(0, Math.min(1, frac)));
+  fg.style.stroke = accColor(acc);
+  $('#ringAcc').textContent = acc == null ? '…' : '±' + (acc < 10 ? acc.toFixed(1) : acc.toFixed(0));
+  $('#ringAcc').style.color = accColor(acc);
+}
+function drawScatter(samples, r) {
+  const c = $('#avgScatter'), g = c.getContext('2d'), W = c.width, H = c.height, cx = W / 2, cy = H / 2;
+  g.clearRect(0, 0, W, H);
+  const mLon = 111320 * Math.cos(r.lat * Math.PI / 180), mLat = 110540;
+  const pts = samples.map(p => [(p.lon - r.lon) * mLon, (p.lat - r.lat) * mLat]);
+  const R = Math.max(2, r.acc, ...pts.map(([x, y]) => Math.hypot(x, y))) * 1.25;
+  const k = (W / 2 - 8) / R;
+  // range rings every "nice" step
+  const step = R > 20 ? 10 : R > 8 ? 5 : R > 4 ? 2 : 1;
+  g.strokeStyle = '#2a3644'; g.lineWidth = 1; g.fillStyle = '#5d6d80'; g.font = '16px sans-serif';
+  for (let d = step; d <= R; d += step) { g.beginPath(); g.arc(cx, cy, d * k, 0, 2 * Math.PI); g.stroke(); }
+  g.fillText(step + ' m', cx + step * k + 3, cy - 3);
+  // accuracy circle
+  g.beginPath(); g.arc(cx, cy, r.acc * k, 0, 2 * Math.PI);
+  g.fillStyle = accColor(r.acc) + '33'; g.fill(); g.strokeStyle = accColor(r.acc); g.lineWidth = 2; g.stroke();
+  // samples (older = fainter)
+  pts.forEach(([x, y], i) => {
+    g.beginPath(); g.arc(cx + x * k, cy - y * k, 5, 0, 2 * Math.PI);
+    g.fillStyle = `rgba(62,166,255,${0.25 + 0.75 * (i + 1) / pts.length})`; g.fill();
+  });
+  // averaged centre
+  g.strokeStyle = '#fff'; g.lineWidth = 3;
+  g.beginPath(); g.moveTo(cx - 12, cy); g.lineTo(cx + 12, cy); g.moveTo(cx, cy - 12); g.lineTo(cx, cy + 12); g.stroke();
+}
+function setRose(sel, deg) { const el = $(sel); if (el) el.style.transform = `rotate(${deg}deg)`; }
+(function buildRoseTicks() {
+  const g = document.querySelector('.roseTicks'); if (!g) return;
+  for (let d = 0; d < 360; d += 30) {
+    const a = d * Math.PI / 180, r1 = d % 90 ? 41 : 37, r2 = 46;
+    const l = document.createElementNS('http://www.w3.org/2000/svg', 'line');
+    l.setAttribute('x1', 50 + r1 * Math.sin(a)); l.setAttribute('y1', 50 - r1 * Math.cos(a));
+    l.setAttribute('x2', 50 + r2 * Math.sin(a)); l.setAttribute('y2', 50 - r2 * Math.cos(a));
+    g.appendChild(l);
+  }
+})();
+
+function clearPreview() { gPreview.clearLayers(); }
+function showPreview(forcePan = false) {
+  clearPreview();
+  if (!cap?.pos) return;
+  const ty = TYPE[cap.type], ll = [cap.pos.lat, cap.pos.lon];
+  if (cap.pos.acc) L.circle(ll, { radius: cap.pos.acc, color: accColor(cap.pos.acc), weight: 2, fillOpacity: .15, interactive: false }).addTo(gPreview);
+  if (cap.pos.from) L.polyline([cap.pos.from, ll], { color: '#ffd400', weight: 3, dashArray: '6 6', interactive: false }).addTo(gPreview);
+  L.marker(ll, { interactive: false, icon: L.divIcon({ className: '', iconSize: [26, 26], html: `<div class="ghostMk" style="width:26px;height:26px;background:${ty.color}88"></div>` }) }).addTo(gPreview);
+  // accuracy banner
+  const w = $('#accWarn'), cls = accClass(cap.pos.acc);
+  if (!cls || cap.method === 'map') w.classList.add('hidden');
+  else { w.className = 'warn ' + cls; w.textContent = t(cls === 'green' ? 'accGood' : cls === 'orange' ? 'accMid' : 'accPoor'); }
+  // duplicate check (within 8 m, ignoring the one being edited)
+  let near = null, nd = Infinity;
+  for (const f of S.features) {
+    if (cap.editing && f.id === cap.editing.id) continue;
+    const d = turf.distance([f.lon, f.lat], [cap.pos.lon, cap.pos.lat], { units: 'meters' });
+    if (d < nd) { nd = d; near = f; }
+  }
+  const dw = $('#dupWarn');
+  if (near && nd < 8) { dw.className = 'warn orange'; dw.textContent = t('dupNear').replace('{type}', t(near.type)).replace('{d}', nd.toFixed(1)); }
+  else dw.classList.add('hidden');
+  // keep the point visible above the sheet
+  if ((forcePan || !cap.panned) && !$('#sheet').classList.contains('hidden')) {
+    cap.panned = true;
+    if (map.getZoom() < 17) map.setView(ll, 18, { animate: false });
+    const pt = map.latLngToContainerPoint(ll), sheetH = $('#sheet').offsetHeight;
+    const top = 64, targetY = Math.max(top + 20, (top + window.innerHeight - sheetH) / 2);
+    map.panBy([pt.x - window.innerWidth / 2, pt.y - targetY], { animate: true });
+  }
+}
+
+function celebrate(pos, type, newId) {
+  haptic(lineMode ? 'MEDIUM' : 'HEAVY');
+  const ty = TYPE[type], fl = $('#flash');
+  fl.style.borderColor = ty.color; fl.querySelector('.flashIc').style.color = ty.color;
+  $('#flashTxt').textContent = t(type) + (lineMode && newId ? ` · #${lineMode.pointIds.length}` : '');
+  fl.classList.remove('hidden'); fl.style.animation = 'none'; void fl.offsetHeight; fl.style.animation = '';
+  clearTimeout(fl._t); fl._t = setTimeout(() => fl.classList.add('hidden'), 950);
+  const rp = L.marker([pos.lat, pos.lon], { interactive: false, icon: L.divIcon({ className: '', iconSize: [20, 20], html: `<div class="ripple" style="--c:${ty.color}"></div>` }) }).addTo(map);
+  setTimeout(() => map.removeLayer(rp), 1500);
+  if (newId) { const el = markerById.get(newId)?.getElement()?.querySelector('.obs-marker'); el?.classList.add('pop'); }
+  updateBand();
+}
+
+function updateBand() {
+  gBand.clearLayers();
+  if (!lineMode || !fix || !lineMode.pointIds.length) return;
+  const last = S.features.find(f => f.id === lineMode.pointIds[lineMode.pointIds.length - 1]); if (!last) return;
+  const d = turf.distance([last.lon, last.lat], [fix.lon, fix.lat], { units: 'meters' });
+  L.polyline([[last.lat, last.lon], [fix.lat, fix.lon]], { color: LINE_COLORS[lineMode.kind], weight: 3, dashArray: '2 8', opacity: .9, interactive: false })
+    .bindTooltip(`${d.toFixed(0)} m ${t('fromLast')}`, { permanent: true, direction: 'center', className: 'bandTip' }).addTo(gBand);
+}
+
+function updateRec() {
+  if (!tracking) return;
+  const sec = Math.floor((Date.now() - trackStats.start) / 1000);
+  $('#recText').textContent = `REC ${(trackStats.m / 1000).toFixed(2)} km · ${Math.floor(sec / 60)}:${String(sec % 60).padStart(2, '0')}`;
+}
+setInterval(updateRec, 1000);
+
+function drawBars() {
+  const counts = Object.fromEntries(TYPES.map(ty => [ty.id, 0]));
+  S.features.forEach(f => counts[f.type] = (counts[f.type] || 0) + 1);
+  const max = Math.max(1, ...Object.values(counts));
+  const lineM = S.lines.reduce((a, l) => { const p = lineLatLngs(l); for (let i = 1; i < p.length; i++) a += turf.distance([p[i - 1][1], p[i - 1][0]], [p[i][1], p[i][0]], { units: 'meters' }); return a; }, 0);
+  let html = `<div class="muted small">${t('byType')}</div>`;
+  for (const ty of TYPES) html += `<div class="bar"><span>${ty.ic} ${t(ty.id)}</span><div class="track"><div class="fill" style="width:${counts[ty.id] / max * 100}%;background:${ty.color}"></div></div><span class="n">${counts[ty.id]}</span></div>`;
+  html += `<div class="bar"><span>⟋ ${t('lineKm')}</span><span class="mono">${S.lines.length} · ${(lineM / 1000).toFixed(2)} km</span><span></span></div>`;
+  html += `<div class="bar"><span>⏺ ${t('trackKm')}</span><span class="mono">${(trackStats.m / 1000).toFixed(2)} km</span><span></span></div>`;
+  $('#statsBars').innerHTML = html;
+  $$('[data-cnt]').forEach(el => { const n = counts[el.dataset.cnt]; el.textContent = n; el.classList.toggle('hidden', !n); });
+}
+function recomputeTrackStats() {
+  trackStats.m = 0; let prev = null;
+  for (const p of S.track) { if (p && prev) trackStats.m += turf.distance([prev[1], prev[0]], [p[1], p[0]], { units: 'meters' }); prev = p; }
+}
+
 // ---------------------------------------------------------------- UI wiring
 function applyLang() {
   document.documentElement.lang = S.lang;
@@ -707,7 +861,7 @@ function applyLang() {
   const pal = $('#palette'); pal.innerHTML = '';
   TYPES.forEach(ty => {
     const b = document.createElement('button'); b.className = 'pbtn' + (ty.dark ? ' darktext' : ''); b.style.background = ty.color;
-    b.innerHTML = `<span class="ic">${ty.ic}</span><span>${t(ty.id)}</span>`;
+    b.innerHTML = `<span class="ic">${ty.ic}</span><span>${t(ty.id)}</span><span class="cnt hidden" data-cnt="${ty.id}"></span>`;
     b.onclick = () => openSheet(ty.id);
     pal.appendChild(b);
   });
@@ -747,7 +901,7 @@ function wire() {
   $('#btnNew').onclick = async () => {
     if (!confirm(t('confirmNew'))) return;
     if (tracking) await setTracking(false);
-    Object.assign(S, { features: [], lines: [], track: [], undo: [] }); lineMode = null;
+    Object.assign(S, { features: [], lines: [], track: [], undo: [] }); lineMode = null; trackStats.m = 0; gBand.clearLayers();
     $('#lineBanner').classList.add('hidden'); $('#btnLine').classList.remove('on-line');
     await DB.clear('photos'); persist(); drawTrack(); refreshAll(); closeAllSheets();
   };
@@ -760,6 +914,7 @@ function wire() {
     if (saved) Object.assign(S, saved, { undo: [] });
     else if (/^pt/i.test(navigator.language)) S.lang = 'en'; // English default by request
   } catch (e) { console.warn(e); }
+  recomputeTrackStats();
   wire(); applyLang(); drawFarm(); drawTrack(); refreshAll();
   if (S.features.length) map.fitBounds(L.featureGroup([...markerById.values()]).getBounds(), { padding: [40, 40], maxZoom: 17 });
   else if (farmPolys) map.fitBounds(L.geoJSON(S.farmGeo).getBounds());
