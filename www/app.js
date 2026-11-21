@@ -7,18 +7,18 @@
 const I18N = {
   en: {
     pole:'Power pole', tower:'Tower', guy:'Guy anchor', silo:'Silo', building:'Building',
-    pivot:'Irrigation', tree:'Tree', other:'Other',
+    pivot:'Pivot', tree:'Tree', other:'Other',
     lineKind_power:'Power line', lineKind_guy:'Guy wire',
     finish:'Finish', cancel:'Cancel', save:'Save', menu:'Menu',
     tapHint:'Move the map so the + is on the obstacle, then tap the map.',
     mGps:'My GPS', mMap:'On map', mBearing:'Bearing + dist',
     startAvg:'Average GPS', stopAvg:'Stop', mapPaneHint:'Use when you can see the obstacle on the satellite image.',
     pickOnMap:'Pick on map', bearingHint:'Stand still, point the phone at the obstacle, read the bearing and enter the distance (rangefinder or estimate).',
-    bearingTrue:'Bearing (° true)', distance:'Distance (m)', useCompass:'Read compass',
-    height:'Height AGL (m)', width:'Width / diameter (m)', notes:'Notes', addPhoto:'📷 Photo',
+    bearingTrue:'Bearing (° true)', distance:'Distance', useCompass:'Read compass',
+    height:'Height AGL', width:'Width / diameter', notes:'Notes', addPhoto:'Add photo',
     farmName:'Farm / site name', operator:'Operator', declination:'Magnetic declination (°, west = negative)',
-    importKml:'📂 Import farm KML/KMZ (spray areas)', clearFarm:'Remove farm boundaries',
-    exportKmz:'⬆ Export KMZ (with photos)', exportKml:'Export KML', exportCsv:'Export CSV',
+    importKml:'Import farm KML/KMZ (spray areas)', clearFarm:'Remove farm boundaries',
+    exportKmz:'Export KMZ (with photos)', exportKml:'Export KML', exportCsv:'Export CSV',
     listFeatures:'Obstacle list', toggleLayer:'Switch map layer', newSession:'New session (erase all)',
     gpsWait:'GPS…', gpsNone:'No GPS', samples:'samples', spread:'spread',
     saved:'Saved', deleted:'Deleted', undone:'Undone', nothingUndo:'Nothing to undo',
@@ -34,23 +34,26 @@ const I18N = {
     compassDenied:'Compass not available', exportEmpty:'Nothing to export',
     noFix:'No GPS position yet', accuracy:'acc', stats:'{p} obstacles · {l} lines · {t} track pts',
     sheetTitleLine:'(line)', addToLine:'Added to line', untitled:'Untitled farm',
-    accGood:'✓ Good GPS accuracy', accMid:'⚠ Fair accuracy — average a bit longer', accPoor:'✖ Poor accuracy — wait, move to open sky or mark on map',
-    dupNear:'⚠ {type} already marked {d} m away — possible duplicate', fromLast:'from last pole', byType:'By type', lineKm:'Lines', trackKm:'Track'
+    accGood:'Good GPS accuracy', accMid:'Fair accuracy — average a bit longer', accPoor:'Poor accuracy — wait, move to open sky or mark on map',
+    dupNear:'{type} already marked {d} m away — possible duplicate', fromLast:'from last pole', byType:'By type', lineKm:'Lines', trackKm:'Track',
+    heightShort:'Height', statObs:'Obstacles', statLines:'Lines', statTrack:'Track', secSession:'Session', secExport:'Export', secFarm:'Farm boundaries', secView:'View',
+    accLbl:'Accuracy', methodLbl:'Method', movedLbl:'moved', listEmpty:'No obstacles yet. Tap a type at the bottom of the map to mark one.',
+    coach:'Tap a type to mark an obstacle at your position', lineHint:'Save poles in order', tapTitle:'Pick on map', sheetSub:'New obstacle', sheetSubEdit:'Editing'
   },
   pt: {
     pole:'Poste', tower:'Torre', guy:'Âncora estai', silo:'Silo', building:'Edificação',
-    pivot:'Irrigação', tree:'Árvore', other:'Outro',
+    pivot:'Pivô', tree:'Árvore', other:'Outro',
     lineKind_power:'Linha de energia', lineKind_guy:'Cabo de estai',
     finish:'Concluir', cancel:'Cancelar', save:'Salvar', menu:'Menu',
     tapHint:'Mova o mapa até o + ficar sobre o obstáculo e toque no mapa.',
     mGps:'Meu GPS', mMap:'No mapa', mBearing:'Rumo + dist',
     startAvg:'Média do GPS', stopAvg:'Parar', mapPaneHint:'Use quando o obstáculo aparece na imagem de satélite.',
     pickOnMap:'Marcar no mapa', bearingHint:'Fique parado, aponte o celular para o obstáculo, leia o rumo e informe a distância (trena laser ou estimativa).',
-    bearingTrue:'Rumo (° verdadeiro)', distance:'Distância (m)', useCompass:'Ler bússola',
-    height:'Altura AGL (m)', width:'Largura / diâmetro (m)', notes:'Observações', addPhoto:'📷 Foto',
+    bearingTrue:'Rumo (° verdadeiro)', distance:'Distância', useCompass:'Ler bússola',
+    height:'Altura AGL', width:'Largura / diâmetro', notes:'Observações', addPhoto:'Adicionar foto',
     farmName:'Fazenda / local', operator:'Operador', declination:'Declinação magnética (°, oeste = negativo)',
-    importKml:'📂 Importar KML/KMZ da fazenda (áreas)', clearFarm:'Remover limites da fazenda',
-    exportKmz:'⬆ Exportar KMZ (com fotos)', exportKml:'Exportar KML', exportCsv:'Exportar CSV',
+    importKml:'Importar KML/KMZ da fazenda (áreas)', clearFarm:'Remover limites da fazenda',
+    exportKmz:'Exportar KMZ (com fotos)', exportKml:'Exportar KML', exportCsv:'Exportar CSV',
     listFeatures:'Lista de obstáculos', toggleLayer:'Trocar camada do mapa', newSession:'Nova sessão (apaga tudo)',
     gpsWait:'GPS…', gpsNone:'Sem GPS', samples:'amostras', spread:'dispersão',
     saved:'Salvo', deleted:'Apagado', undone:'Desfeito', nothingUndo:'Nada para desfazer',
@@ -66,25 +69,41 @@ const I18N = {
     compassDenied:'Bússola indisponível', exportEmpty:'Nada para exportar',
     noFix:'Ainda sem posição GPS', accuracy:'prec', stats:'{p} obstáculos · {l} linhas · {t} pts de trilha',
     sheetTitleLine:'(linha)', addToLine:'Adicionado à linha', untitled:'Fazenda sem nome',
-    accGood:'✓ Precisão do GPS boa', accMid:'⚠ Precisão razoável — faça a média por mais tempo', accPoor:'✖ Precisão ruim — aguarde, vá para céu aberto ou marque no mapa',
-    dupNear:'⚠ {type} já marcado a {d} m — possível duplicado', fromLast:'do último poste', byType:'Por tipo', lineKm:'Linhas', trackKm:'Trilha'
+    accGood:'Precisão do GPS boa', accMid:'Precisão razoável — faça a média por mais tempo', accPoor:'Precisão ruim — aguarde, vá para céu aberto ou marque no mapa',
+    dupNear:'{type} já marcado a {d} m — possível duplicado', fromLast:'do último poste', byType:'Por tipo', lineKm:'Linhas', trackKm:'Trilha',
+    heightShort:'Altura', statObs:'Obstáculos', statLines:'Linhas', statTrack:'Trilha', secSession:'Sessão', secExport:'Exportar', secFarm:'Limites da fazenda', secView:'Visualizar',
+    accLbl:'Precisão', methodLbl:'Método', movedLbl:'movido', listEmpty:'Nenhum obstáculo ainda. Toque em um tipo na parte de baixo do mapa para marcar.',
+    coach:'Toque em um tipo para marcar um obstáculo na sua posição', lineHint:'Salve os postes em ordem', tapTitle:'Marcar no mapa', sheetSub:'Novo obstáculo', sheetSubEdit:'Editando'
   }
 };
 // Export labels are always English (for the Pyka team)
 const EN = I18N.en;
 
+// Line icons (24×24, stroked with currentColor)
+const svg = d => `<svg viewBox="0 0 24 24" aria-hidden="true">${d}</svg>`;
+const ICONS = {
+  pole:     svg('<path d="M12 3v18M6 6.5h12M7.5 6.5v2M16.5 6.5v2M9 21h6"/>'),
+  tower:    svg('<path d="M8.5 21 12 3l3.5 18M6.5 8h11M10 13.5h4M9.2 17.5l5.6-4M14.8 17.5l-5.6-4"/>'),
+  guy:      svg('<path d="M8 3v18M8 4.5l10 14.5M15.5 21h5M5 21h6"/>'),
+  pivot:    svg('<circle cx="12" cy="12" r="8.5"/><path d="M12 12l6-6"/><circle cx="12" cy="12" r="1.7" class="fill"/><circle cx="14.2" cy="9.8" r="1" class="fill"/><circle cx="16.2" cy="7.8" r="1" class="fill"/>'),
+  building: svg('<path d="M4 21V10l8-6 8 6v11M3 21h18M10 21v-5h4v5"/>'),
+  other:    svg('<path d="M12 4 21 20H3z"/><path d="M12 10v4.5M12 17.2v.1"/>'),
+  legacy:   svg('<circle cx="12" cy="12" r="6"/>'),
+};
+// guy / silo / tree are retired from the palette but kept so older sessions still draw and export.
 const TYPES = [
-  { id:'pole',     color:'#ffd400', ic:'⚡' },
-  { id:'tower',    color:'#ff3b30', ic:'🗼', dark:true },
-  { id:'guy',      color:'#ff9500', ic:'⚓' },
-  { id:'silo',     color:'#bf5af2', ic:'🛢', dark:true },
-  { id:'building', color:'#aeb4bc', ic:'🏠' },
-  { id:'pivot',    color:'#3ea6ff', ic:'💧' },
-  { id:'tree',     color:'#30d158', ic:'🌳' },
-  { id:'other',    color:'#ffffff', ic:'⚠' },
+  { id:'pole',     color:'#f5c400' },
+  { id:'tower',    color:'#f0503c' },
+  { id:'pivot',    color:'#4aa3f0' },
+  { id:'building', color:'#a9b3bd' },
+  { id:'other',    color:'#e8ecef' },
+  { id:'guy',      color:'#f08c28', retired:true },
+  { id:'silo',     color:'#b07ae8', retired:true },
+  { id:'tree',     color:'#3fbf6a', retired:true },
 ];
+TYPES.forEach(ty => ty.svg = ICONS[ty.id] || ICONS.legacy);
 const TYPE = Object.fromEntries(TYPES.map(t => [t.id, t]));
-const LINE_COLORS = { power:'#ffd400', guy:'#ff9500' };
+const LINE_COLORS = { power:'#f5c400', guy:'#f08c28' };
 const BUFFER_KM = 1.5;
 
 // ---------------------------------------------------------------- tiny IndexedDB
@@ -187,7 +206,7 @@ function setBasemap(id, announce) {
   const bm = BASEMAPS.find(b => b.id === id) || BASEMAPS[0];
   baseLayers = bm.make(); baseLayers.forEach((l, i) => { l.addTo(map); if (i === 0) l.bringToBack(); });
   S.basemap = bm.id;
-  if (announce) toast('🛰 ' + (bm.name[S.lang] || bm.name.en));
+  if (announce) toast(bm.name[S.lang] || bm.name.en);
 }
 function nextBasemap() {
   const i = BASEMAPS.findIndex(b => b.id === S.basemap);
@@ -200,7 +219,7 @@ const gTrack = L.layerGroup().addTo(map);
 const gLines = L.layerGroup().addTo(map);
 const gObs = L.layerGroup().addTo(map);
 const gMe = L.layerGroup().addTo(map);
-let trackLine = L.polyline([], { color: '#3ea6ff', weight: 3, opacity: .8, dashArray: '6 6' }).addTo(gTrack);
+let trackLine = L.polyline([], { color: '#4aa3f0', weight: 3, opacity: .85, dashArray: '6 6' }).addTo(gTrack);
 let activeLineDraft = L.polyline([], { color: '#ffd400', weight: 4, dashArray: '4 6' }).addTo(gLines);
 
 // ---------------------------------------------------------------- GPS
@@ -208,7 +227,7 @@ let fix = null;          // latest {lat,lon,acc,ts,heading}
 let firstFix = true;
 const fixListeners = new Set();
 const meMarker = L.marker([0, 0], { icon: L.divIcon({ className: '', html: '<div class="me-marker"></div>', iconSize: [18, 18] }), interactive: false });
-const meAcc = L.circle([0, 0], { radius: 1, color: '#3ea6ff', weight: 1, fillOpacity: .12, interactive: false });
+const meAcc = L.circle([0, 0], { radius: 1, color: '#4aa3f0', weight: 1, opacity: .6, fillOpacity: .1, interactive: false });
 
 function onPos(p) {
   fix = { lat: p.coords.latitude, lon: p.coords.longitude, acc: p.coords.accuracy, ts: p.timestamp || Date.now() };
@@ -266,8 +285,8 @@ function drawTrack() {
   gTrack.clearLayers();
   const segs = []; let cur = [];
   for (const p of S.track) { if (!p) { if (cur.length) segs.push(cur); cur = []; } else cur.push([p[0], p[1]]); }
-  segs.forEach(s => L.polyline(s, { color: '#3ea6ff', weight: 3, opacity: .7, dashArray: '6 6' }).addTo(gTrack));
-  trackLine = L.polyline(cur, { color: '#3ea6ff', weight: 3, opacity: .8, dashArray: '6 6' }).addTo(gTrack);
+  segs.forEach(s => L.polyline(s, { color: '#4aa3f0', weight: 3, opacity: .7, dashArray: '6 6' }).addTo(gTrack));
+  trackLine = L.polyline(cur, { color: '#4aa3f0', weight: 3, opacity: .85, dashArray: '6 6' }).addTo(gTrack);
 }
 
 // ---------------------------------------------------------------- farm (spray areas) + 1.5 km buffer
@@ -277,15 +296,15 @@ function drawFarm() {
   if (!S.farmGeo) return;
   const polys = S.farmGeo.features.filter(f => f.geometry && /Polygon/.test(f.geometry.type));
   L.geoJSON(S.farmGeo, {
-    style: { color: '#2fd27a', weight: 2, fillOpacity: .08 },
-    pointToLayer: (f, ll) => L.circleMarker(ll, { radius: 4, color: '#2fd27a' })
+    style: { color: '#34c77b', weight: 2, opacity: .9, fillColor: '#34c77b', fillOpacity: .07 },
+    pointToLayer: (f, ll) => L.circleMarker(ll, { radius: 4, color: '#34c77b', weight: 2, fillOpacity: .6 })
   }).addTo(gFarm);
   if (polys.length) {
     try {
       farmPolys = turf.featureCollection(polys);
       const buf = turf.buffer(farmPolys, BUFFER_KM, { units: 'kilometers' });
       farmBuffer = buf.features.length > 1 ? buf.features.reduce((a, b) => { try { return turf.union(turf.featureCollection([a, b])) || a; } catch { return a; } }) : buf.features[0];
-      L.geoJSON(farmBuffer, { style: { color: '#ffb020', weight: 1.5, dashArray: '8 6', fill: false }, interactive: false }).addTo(gFarm);
+      L.geoJSON(farmBuffer, { style: { color: '#f0a020', weight: 1.5, opacity: .8, dashArray: '2 7', lineCap: 'round', fill: false }, interactive: false }).addTo(gFarm);
     } catch (e) { console.warn('buffer failed', e); }
   }
 }
@@ -319,10 +338,10 @@ async function importFarm(file) {
 
 // ---------------------------------------------------------------- obstacle markers + lines
 function iconFor(f) {
-  const ty = TYPE[f.type] || TYPE.other;
-  const sz = f.type === 'pole' ? 16 : 22;
-  return L.divIcon({ className: '', iconSize: [sz, sz],
-    html: `<div class="obs-marker" style="width:${sz}px;height:${sz}px;background:${ty.color}">${f.type === 'pole' ? '' : (f.height ? Math.round(f.height) : '')}</div>` });
+  const ty = TYPE[f.type] || TYPE.other, pole = f.type === 'pole', sz = pole ? 14 : 26;
+  const tag = f.height ? `<span class="hTag">${fmt(f.height, f.height % 1 ? 1 : 0)} m</span>` : '';
+  return L.divIcon({ className: 'obs-wrap', iconSize: [sz, sz],
+    html: `<div class="obs-marker${pole ? ' pole' : ''}" style="--c:${ty.color}">${pole ? '' : ty.svg}</div>${pole ? '' : tag}` });
 }
 const markerById = new Map();
 function drawFeatures() {
@@ -339,10 +358,11 @@ function lineLatLngs(l) {
 function drawLines() {
   gLines.clearLayers();
   for (const l of S.lines) {
-    L.polyline(lineLatLngs(l), { color: LINE_COLORS[l.kind] || '#ffd400', weight: 4, opacity: .95 })
+    L.polyline(lineLatLngs(l), { color: '#0d1013', weight: 8, opacity: .55, interactive: false }).addTo(gLines);
+    L.polyline(lineLatLngs(l), { color: LINE_COLORS[l.kind] || '#f5c400', weight: 3.5, opacity: 1 })
       .bindPopup(`<b>${t('lineKind_' + l.kind)}</b><br>${l.pointIds.length} ${t('poles')}`).addTo(gLines);
   }
-  activeLineDraft = L.polyline(lineMode ? lineLatLngs(lineMode) : [], { color: LINE_COLORS[lineMode?.kind] || '#ffd400', weight: 4, dashArray: '4 6' }).addTo(gLines);
+  activeLineDraft = L.polyline(lineMode ? lineLatLngs(lineMode) : [], { color: LINE_COLORS[lineMode?.kind] || '#f5c400', weight: 3.5, dashArray: '1 8', lineCap: 'round' }).addTo(gLines);
 }
 function refreshAll() { drawFeatures(); drawLines(); updateStats(); $('#farmTitle').textContent = S.farm || ''; }
 
@@ -351,14 +371,16 @@ async function openPopup(f, m) {
   for (const pid of (f.photos || []).slice(0, 2)) {
     const b = await DB.get('photos', pid); if (b) imgs += `<img src="${URL.createObjectURL(b)}">`;
   }
-  const z = zoneOf(f.lat, f.lon);
-  const html = `<b>${t(f.type)}</b>${f.lineId ? ' · ' + t('lineKind_' + (S.lines.find(l => l.id === f.lineId)?.kind || (lineMode?.id === f.lineId ? lineMode.kind : 'power'))) : ''}<br>
-    <span class="mono">${f.lat.toFixed(6)}, ${f.lon.toFixed(6)}</span><br>
-    ${t('height')}: <b>${fmt(f.height)}</b> · ±${fmt(f.acc, 0)} m · ${f.method}<br>
-    ${f.width ? t('width') + ': ' + fmt(f.width) + '<br>' : ''}${f.notes ? '<i>' + escapeHtml(f.notes) + '</i><br>' : ''}
-    ${z ? '<small>' + zoneLabel(z) + '</small><br>' : ''}${imgs}
-    <div class="pbtns"><button data-a="edit">${t('edit')}</button><button data-a="move">${t('move')}</button><button data-a="del">${t('del')}</button></div>`;
-  m.bindPopup(html).openPopup();
+  const z = zoneOf(f.lat, f.lon), ty = TYPE[f.type] || TYPE.other;
+  const lineKind = f.lineId ? t('lineKind_' + (S.lines.find(l => l.id === f.lineId)?.kind || (lineMode?.id === f.lineId ? lineMode.kind : 'power'))) : '';
+  const kv = (k, v) => `<div><dt>${k}</dt><dd>${v}</dd></div>`;
+  const html = `<div class="pop">
+    <div class="popHead"><span class="typeIc sm" style="--c:${ty.color}">${ty.svg}</span><div class="popTitle"><b>${t(f.type)}</b>${lineKind ? `<span>${lineKind}</span>` : ''}</div>${z ? `<span class="zone ${z}">${zoneLabel(z)}</span>` : ''}</div>
+    <dl class="kv">${kv(t('heightShort'), f.height != null ? fmt(f.height) + ' m' : '—')}${kv(t('accLbl'), f.acc != null ? '±' + fmt(f.acc, 0) + ' m' : '—')}${kv(t('methodLbl'), methodLabel(f.method))}${f.width ? kv(t('width'), fmt(f.width) + ' m') : ''}</dl>
+    <div class="mono coords">${f.lat.toFixed(6)}, ${f.lon.toFixed(6)}</div>
+    ${f.notes ? '<p class="notes">' + escapeHtml(f.notes) + '</p>' : ''}${imgs ? '<div class="popImgs">' + imgs + '</div>' : ''}
+    <div class="pbtns"><button data-a="edit">${t('edit')}</button><button data-a="move">${t('move')}</button><button data-a="del" class="danger">${t('del')}</button></div></div>`;
+  m.bindPopup(html, { autoPanPaddingTopLeft: [12, 72], autoPanPaddingBottomRight: [68, 110], maxWidth: 300 }).openPopup();
   const el = m.getPopup().getElement();
   el.querySelector('[data-a=edit]').onclick = () => { map.closePopup(); openSheet(f.type, f); };
   el.querySelector('[data-a=del]').onclick = () => { map.closePopup(); deleteFeature(f.id); };
@@ -370,6 +392,10 @@ async function openPopup(f, m) {
       S.undo.push({ op: 'move', id: f.id, old }); m.dragging.disable(); persist(); refreshAll(); toast(t('moved'));
     });
   };
+}
+function methodLabel(m) {
+  const [base, moved] = String(m || '').split('+');
+  return ({ gps: t('mGps'), map: t('mMap'), bearing: t('mBearing') })[base] + (moved ? ' · ' + t('movedLbl') : '');
 }
 const escapeHtml = s => String(s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c]);
 
@@ -413,7 +439,8 @@ function startLine() {
 function updateLineBanner() {
   if (!lineMode) return;
   $('#lineBannerTitle').textContent = t('lineKind_' + lineMode.kind);
-  $('#lineBannerCount').textContent = `· ${lineMode.pointIds.length} ${t('poles')}`;
+  $('#lineBannerCount').textContent = lineMode.pointIds.length ? `${lineMode.pointIds.length} ${t('poles')}` : t('lineHint');
+  $('#lineBanner').style.setProperty('--c', LINE_COLORS[lineMode.kind]);
   drawLines();
 }
 function finishLine(cancel = false) {
@@ -437,8 +464,9 @@ function openSheet(type, editing = null) {
   cap = { type, editing, method: 'gps', pos: editing ? { lat: editing.lat, lon: editing.lon, acc: editing.acc } : null,
           photos: [], keepPhotos: editing ? [...(editing.photos || [])] : [] };
   const ty = TYPE[type];
-  $('#sheetSwatch').style.background = ty.color;
-  $('#sheetTitle').textContent = t(type) + (lineMode && !editing ? ' ' + t('sheetTitleLine') : '');
+  const ic = $('#sheetIcon'); ic.innerHTML = ty.svg; ic.style.setProperty('--c', ty.color);
+  $('#sheetTitle').textContent = t(type);
+  $('#sheetSub').textContent = editing ? t('sheetSubEdit') : (lineMode ? t('lineKind_' + lineMode.kind) + ' · #' + (lineMode.pointIds.length + 1) : t('sheetSub'));
   $('#inHeight').value = editing?.height ?? (lastHeight[type] ?? '');
   $('#inWidth').value = editing?.width ?? '';
   $('#inNotes').value = editing?.notes ?? '';
@@ -447,7 +475,7 @@ function openSheet(type, editing = null) {
   $('#inBearing').value = ''; $('#inDist').value = '';
   resetCaptureVisuals();
   renderThumbs(); setMethod(editing ? (editing.method.split('+')[0] || 'gps') : 'gps');
-  $('#sheet').classList.remove('hidden'); $('#lineBanner').classList.add('hidden');
+  $('#sheet').classList.remove('hidden'); $('#lineBanner').classList.add('hidden'); moveTabInd();
   updateSaveBtn();
   // auto-start averaging for fast pole capture
   if (!editing) startAvg();
@@ -457,8 +485,14 @@ function setMethod(m) {
   cap.method = m;
   $$('#methodTabs .tab').forEach(b => b.classList.toggle('active', b.dataset.m === m));
   $$('#sheet .pane').forEach(p => p.classList.toggle('hidden', p.dataset.pane !== m));
+  moveTabInd();
   if (m !== 'gps') stopAvg();
   if (m === 'bearing') prepBearing();
+}
+function moveTabInd() {
+  const a = $('#methodTabs .tab.active'), ind = $('#methodTabs .tabInd');
+  if (!a || !ind || !a.offsetWidth) return;
+  ind.style.width = a.offsetWidth + 'px'; ind.style.transform = 'translateX(' + a.offsetLeft + 'px)';
 }
 function updateSaveBtn() { $('#btnSave').disabled = !(cap && cap.pos); }
 function closeAllSheets() { ['#sheet', '#menu', '#list'].forEach(s => $(s).classList.add('hidden')); if (lineMode) $('#lineBanner').classList.remove('hidden'); stopAvg(); stopCompass(); cancelTapPick(); clearPreview(); }
@@ -717,16 +751,22 @@ async function exportCsv() {
 // ---------------------------------------------------------------- list + stats
 function updateStats() {
   drawBars();
-  $('#stats').textContent = t('stats').replace('{p}', S.features.length).replace('{l}', S.lines.length).replace('{t}', S.track.filter(Boolean).length);
+  const lineM = S.lines.reduce((a, l) => { const p = lineLatLngs(l); for (let i = 1; i < p.length; i++) a += turf.distance([p[i - 1][1], p[i - 1][0]], [p[i][1], p[i][0]], { units: 'meters' }); return a; }, 0);
+  const tile = (n, unit, lbl) => `<div class="stat"><b>${n}<small>${unit}</small></b><span>${lbl}</span></div>`;
+  $('#stats').innerHTML = tile(S.features.length, '', t('statObs')) + tile(S.lines.length, ' · ' + (lineM / 1000).toFixed(1) + ' km', t('statLines'))
+    + tile((trackStats.m / 1000).toFixed(1), ' km', t('statTrack'));
+  $('#coach').classList.toggle('hidden', S.features.length > 0);
 }
 function openList() {
   closeAllSheets();
   const body = $('#listBody'); body.innerHTML = '';
-  [...S.features].reverse().forEach(f => {
-    const ty = TYPE[f.type];
-    const row = document.createElement('div'); row.className = 'li';
-    row.innerHTML = `<span class="swatch" style="background:${ty.color}"></span><div class="meta"><b>${t(f.type)}</b> ${f.height ? f.height + ' m' : ''}<br><span class="mono muted">${f.lat.toFixed(5)}, ${f.lon.toFixed(5)} · ±${fmt(f.acc, 0)} m · ${new Date(f.ts).toLocaleTimeString()}</span>${f.notes ? '<br>' + escapeHtml(f.notes) : ''}</div><button class="btn">◎</button>`;
-    row.querySelector('button').onclick = () => { closeAllSheets(); map.setView([f.lat, f.lon], 19); setTimeout(() => markerById.get(f.id)?.fire('click'), 300); };
+  $('#listCount').textContent = S.features.length || '';
+  if (!S.features.length) body.innerHTML = `<div class="empty">${svg('<circle cx="12" cy="12" r="8"/><path d="M12 2v4M12 18v4M2 12h4M18 12h4"/>')}<p>${t('listEmpty')}</p></div>`;
+  [...S.features].reverse().forEach((f, i) => {
+    const ty = TYPE[f.type] || TYPE.other;
+    const row = document.createElement('button'); row.className = 'li'; row.style.setProperty('--i', Math.min(i, 12));
+    row.innerHTML = `<span class="typeIc sm" style="--c:${ty.color}">${ty.svg}</span><span class="meta"><b>${t(f.type)}${f.height ? ` <em>${fmt(f.height)} m</em>` : ''}</b><span class="mono muted">${f.lat.toFixed(5)}, ${f.lon.toFixed(5)} · ${f.acc != null ? '±' + fmt(f.acc, 0) + ' m' : t('mMap')}</span>${f.notes ? `<span class="note">${escapeHtml(f.notes)}</span>` : ''}</span><span class="time mono muted">${new Date(f.ts).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</span>${svg('<path d="m9 6 6 6-6 6"/>')}`;
+    row.onclick = () => { closeAllSheets(); map.setView([f.lat, f.lon], 19); setTimeout(() => markerById.get(f.id)?.fire('click'), 300); };
     body.appendChild(row);
   });
   $('#list').classList.remove('hidden');
@@ -742,7 +782,7 @@ function haptic(kind = 'MEDIUM') {
   if (navigator.vibrate) navigator.vibrate(kind === 'HEAVY' ? [30, 40, 30] : 25);
 }
 const accClass = a => a == null ? '' : a <= 5 ? 'green' : a <= 12 ? 'orange' : 'red';
-const accColor = a => ({ green: '#2fd27a', orange: '#ffb020', red: '#ff4d4f' })[accClass(a)] || '#3ea6ff';
+const accColor = a => ({ green: '#34c77b', orange: '#f0a020', red: '#f0503c' })[accClass(a)] || '#4aa3f0';
 
 function resetCaptureVisuals() {
   drawRing(0, null);
@@ -767,7 +807,7 @@ function drawScatter(samples, r) {
   const k = (W / 2 - 8) / R;
   // range rings every "nice" step
   const step = R > 20 ? 10 : R > 8 ? 5 : R > 4 ? 2 : 1;
-  g.strokeStyle = '#2a3644'; g.lineWidth = 1; g.fillStyle = '#5d6d80'; g.font = '16px sans-serif';
+  g.strokeStyle = '#2a3139'; g.lineWidth = 1.5; g.fillStyle = '#6b7681'; g.font = '600 17px -apple-system, sans-serif';
   for (let d = step; d <= R; d += step) { g.beginPath(); g.arc(cx, cy, d * k, 0, 2 * Math.PI); g.stroke(); }
   g.fillText(step + ' m', cx + step * k + 3, cy - 3);
   // accuracy circle
@@ -776,10 +816,10 @@ function drawScatter(samples, r) {
   // samples (older = fainter)
   pts.forEach(([x, y], i) => {
     g.beginPath(); g.arc(cx + x * k, cy - y * k, 5, 0, 2 * Math.PI);
-    g.fillStyle = `rgba(62,166,255,${0.25 + 0.75 * (i + 1) / pts.length})`; g.fill();
+    g.fillStyle = `rgba(74,163,240,${0.25 + 0.75 * (i + 1) / pts.length})`; g.fill();
   });
   // averaged centre
-  g.strokeStyle = '#fff'; g.lineWidth = 3;
+  g.strokeStyle = '#e8ecef'; g.lineWidth = 3; g.lineCap = 'round';
   g.beginPath(); g.moveTo(cx - 12, cy); g.lineTo(cx + 12, cy); g.moveTo(cx, cy - 12); g.lineTo(cx, cy + 12); g.stroke();
 }
 function setRose(sel, deg) { const el = $(sel); if (el) el.style.transform = `rotate(${deg}deg)`; }
@@ -800,8 +840,8 @@ function showPreview(forcePan = false) {
   if (!cap?.pos) return;
   const ty = TYPE[cap.type], ll = [cap.pos.lat, cap.pos.lon];
   if (cap.pos.acc) L.circle(ll, { radius: cap.pos.acc, color: accColor(cap.pos.acc), weight: 2, fillOpacity: .15, interactive: false }).addTo(gPreview);
-  if (cap.pos.from) L.polyline([cap.pos.from, ll], { color: '#ffd400', weight: 3, dashArray: '6 6', interactive: false }).addTo(gPreview);
-  L.marker(ll, { interactive: false, icon: L.divIcon({ className: '', iconSize: [26, 26], html: `<div class="ghostMk" style="width:26px;height:26px;background:${ty.color}88"></div>` }) }).addTo(gPreview);
+  if (cap.pos.from) L.polyline([cap.pos.from, ll], { color: '#f5c400', weight: 2.5, dashArray: '1 7', lineCap: 'round', interactive: false }).addTo(gPreview);
+  L.marker(ll, { interactive: false, icon: L.divIcon({ className: '', iconSize: [26, 26], html: `<div class="ghostMk" style="--c:${ty.color}"></div>` }) }).addTo(gPreview);
   // accuracy banner
   const w = $('#accWarn'), cls = accClass(cap.pos.acc);
   if (!cls || cap.method === 'map') w.classList.add('hidden');
@@ -859,13 +899,14 @@ function drawBars() {
   const counts = Object.fromEntries(TYPES.map(ty => [ty.id, 0]));
   S.features.forEach(f => counts[f.type] = (counts[f.type] || 0) + 1);
   const max = Math.max(1, ...Object.values(counts));
-  const lineM = S.lines.reduce((a, l) => { const p = lineLatLngs(l); for (let i = 1; i < p.length; i++) a += turf.distance([p[i - 1][1], p[i - 1][0]], [p[i][1], p[i][0]], { units: 'meters' }); return a; }, 0);
-  let html = `<div class="muted small">${t('byType')}</div>`;
-  for (const ty of TYPES) html += `<div class="bar"><span>${ty.ic} ${t(ty.id)}</span><div class="track"><div class="fill" style="width:${counts[ty.id] / max * 100}%;background:${ty.color}"></div></div><span class="n">${counts[ty.id]}</span></div>`;
-  html += `<div class="bar"><span>⟋ ${t('lineKm')}</span><span class="mono">${S.lines.length} · ${(lineM / 1000).toFixed(2)} km</span><span></span></div>`;
-  html += `<div class="bar"><span>⏺ ${t('trackKm')}</span><span class="mono">${(trackStats.m / 1000).toFixed(2)} km</span><span></span></div>`;
+  let html = '';
+  for (const ty of TYPES) if (!ty.retired || counts[ty.id]) html += `<div class="bar"><span><i class="sw" style="background:${ty.color}"></i>${t(ty.id)}</span><div class="track"><div class="fill" style="width:${counts[ty.id] / max * 100}%;background:${ty.color}"></div></div><span class="n">${counts[ty.id]}</span></div>`;
   $('#statsBars').innerHTML = html;
-  $$('[data-cnt]').forEach(el => { const n = counts[el.dataset.cnt]; el.textContent = n; el.classList.toggle('hidden', !n); });
+  $$('[data-cnt]').forEach(el => {
+    const n = counts[el.dataset.cnt], changed = el.textContent !== String(n);
+    el.textContent = n; el.classList.toggle('hidden', !n);
+    if (changed && n) { el.classList.remove('bump'); void el.offsetWidth; el.classList.add('bump'); }
+  });
 }
 function recomputeTrackStats() {
   trackStats.m = 0; let prev = null;
@@ -878,9 +919,9 @@ function applyLang() {
   $('#btnLang').textContent = S.lang === 'en' ? 'PT' : 'EN';
   $$('[data-i18n]').forEach(el => el.textContent = t(el.dataset.i18n));
   const pal = $('#palette'); pal.innerHTML = '';
-  TYPES.forEach(ty => {
-    const b = document.createElement('button'); b.className = 'pbtn' + (ty.dark ? ' darktext' : ''); b.style.background = ty.color;
-    b.innerHTML = `<span class="ic">${ty.ic}</span><span>${t(ty.id)}</span><span class="cnt hidden" data-cnt="${ty.id}"></span>`;
+  TYPES.filter(ty => !ty.retired).forEach((ty, i) => {
+    const b = document.createElement('button'); b.className = 'pbtn'; b.style.setProperty('--c', ty.color); b.style.setProperty('--i', i);
+    b.innerHTML = `<span class="ic">${ty.svg}</span><span class="lb">${t(ty.id)}</span><span class="cnt hidden" data-cnt="${ty.id}"></span>`;
     b.onclick = () => openSheet(ty.id);
     pal.appendChild(b);
   });

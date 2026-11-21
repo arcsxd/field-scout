@@ -6,7 +6,7 @@ Mark power poles, power lines, guy wires and tall features with the phone GPS an
 App de scouting de obstáculos para o processo de mapeamento da Pyka (Step 4). Interface em inglês, com botão para português.
 
 ## Features
-- Obstacle types: power pole, tower, guy anchor, silo, building, irrigation, tree, other
+- Obstacle types: power pole, tower, irrigation pivot, building, other
 - 3 ways to mark: **GPS averaging** (5–30 s, accuracy-weighted), **pick on satellite map**, **bearing + distance** (compass + rangefinder)
 - **Line mode**: poles saved in sequence become a Power Line (or Guy Wire) LineString
 - Height AGL, width, notes, photos per obstacle
