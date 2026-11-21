@@ -1,1 +1,1 @@
-{"name":"Field Scout","short_name":"Field Scout","start_url":"./","display":"standalone","background_color":"#0b0f14","theme_color":"#0b0f14","icons":[{"src":"icon-512.png","sizes":"512x512","type":"image/png"}]}
+{"name": "Field Scout", "short_name": "Field Scout", "start_url": "./", "display": "standalone", "background_color": "#0d1013", "theme_color": "#0d1013", "icons": [{"src": "icon-512.png", "sizes": "512x512", "type": "image/png"}, {"src": "icon-1024.png", "sizes": "1024x1024", "type": "image/png", "purpose": "any"}]}
