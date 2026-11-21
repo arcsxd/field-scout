@@ -15,10 +15,10 @@ const I18N = {
     startAvg:'Average GPS', stopAvg:'Stop', mapPaneHint:'Use when you can see the obstacle on the satellite image.',
     pickOnMap:'Pick on map', bearingHint:'Stand still, point the phone at the obstacle, read the bearing and enter the distance (rangefinder or estimate).',
     bearingTrue:'Bearing (° true)', distance:'Distance (m)', useCompass:'Read compass',
-    height:'Height AGL (m)', width:'Width / diameter (m)', notes:'Notes', addPhoto:'📷 Photo',
+    height:'Height AGL (m)', width:'Width / diameter (m)', notes:'Notes', addPhoto:'Add photo',
     farmName:'Farm / site name', operator:'Operator', declination:'Magnetic declination (°, west = negative)',
-    importKml:'📂 Import farm KML/KMZ (spray areas)', clearFarm:'Remove farm boundaries',
-    exportKmz:'⬆ Export KMZ (with photos)', exportKml:'Export KML', exportCsv:'Export CSV',
+    importKml:'Import farm KML/KMZ (spray areas)', clearFarm:'Remove farm boundaries',
+    exportKmz:'Export KMZ (with photos)', exportKml:'Export KML', exportCsv:'Export CSV',
     listFeatures:'Obstacle list', toggleLayer:'Switch map layer', newSession:'New session (erase all)',
     gpsWait:'GPS…', gpsNone:'No GPS', samples:'samples', spread:'spread',
     saved:'Saved', deleted:'Deleted', undone:'Undone', nothingUndo:'Nothing to undo',
@@ -34,8 +34,8 @@ const I18N = {
     compassDenied:'Compass not available', exportEmpty:'Nothing to export',
     noFix:'No GPS position yet', accuracy:'acc', stats:'{p} obstacles · {l} lines · {t} track pts',
     sheetTitleLine:'(line)', addToLine:'Added to line', untitled:'Untitled farm',
-    accGood:'✓ Good GPS accuracy', accMid:'⚠ Fair accuracy — average a bit longer', accPoor:'✖ Poor accuracy — wait, move to open sky or mark on map',
-    dupNear:'⚠ {type} already marked {d} m away — possible duplicate', fromLast:'from last pole', byType:'By type', lineKm:'Lines', trackKm:'Track'
+    accGood:'Good GPS accuracy', accMid:'Fair accuracy — average a bit longer', accPoor:'Poor accuracy — wait, move to open sky or mark on map',
+    dupNear:'{type} already marked {d} m away — possible duplicate', fromLast:'from last pole', byType:'By type', lineKm:'Lines', trackKm:'Track'
   },
   pt: {
     pole:'Poste', tower:'Torre', guy:'Âncora estai', silo:'Silo', building:'Edificação',
@@ -47,10 +47,10 @@ const I18N = {
     startAvg:'Média do GPS', stopAvg:'Parar', mapPaneHint:'Use quando o obstáculo aparece na imagem de satélite.',
     pickOnMap:'Marcar no mapa', bearingHint:'Fique parado, aponte o celular para o obstáculo, leia o rumo e informe a distância (trena laser ou estimativa).',
     bearingTrue:'Rumo (° verdadeiro)', distance:'Distância (m)', useCompass:'Ler bússola',
-    height:'Altura AGL (m)', width:'Largura / diâmetro (m)', notes:'Observações', addPhoto:'📷 Foto',
+    height:'Altura AGL (m)', width:'Largura / diâmetro (m)', notes:'Observações', addPhoto:'Adicionar foto',
     farmName:'Fazenda / local', operator:'Operador', declination:'Declinação magnética (°, oeste = negativo)',
-    importKml:'📂 Importar KML/KMZ da fazenda (áreas)', clearFarm:'Remover limites da fazenda',
-    exportKmz:'⬆ Exportar KMZ (com fotos)', exportKml:'Exportar KML', exportCsv:'Exportar CSV',
+    importKml:'Importar KML/KMZ da fazenda (áreas)', clearFarm:'Remover limites da fazenda',
+    exportKmz:'Exportar KMZ (com fotos)', exportKml:'Exportar KML', exportCsv:'Exportar CSV',
     listFeatures:'Lista de obstáculos', toggleLayer:'Trocar camada do mapa', newSession:'Nova sessão (apaga tudo)',
     gpsWait:'GPS…', gpsNone:'Sem GPS', samples:'amostras', spread:'dispersão',
     saved:'Salvo', deleted:'Apagado', undone:'Desfeito', nothingUndo:'Nada para desfazer',
@@ -66,23 +66,35 @@ const I18N = {
     compassDenied:'Bússola indisponível', exportEmpty:'Nada para exportar',
     noFix:'Ainda sem posição GPS', accuracy:'prec', stats:'{p} obstáculos · {l} linhas · {t} pts de trilha',
     sheetTitleLine:'(linha)', addToLine:'Adicionado à linha', untitled:'Fazenda sem nome',
-    accGood:'✓ Precisão do GPS boa', accMid:'⚠ Precisão razoável — faça a média por mais tempo', accPoor:'✖ Precisão ruim — aguarde, vá para céu aberto ou marque no mapa',
-    dupNear:'⚠ {type} já marcado a {d} m — possível duplicado', fromLast:'do último poste', byType:'Por tipo', lineKm:'Linhas', trackKm:'Trilha'
+    accGood:'Precisão do GPS boa', accMid:'Precisão razoável — faça a média por mais tempo', accPoor:'Precisão ruim — aguarde, vá para céu aberto ou marque no mapa',
+    dupNear:'{type} já marcado a {d} m — possível duplicado', fromLast:'do último poste', byType:'Por tipo', lineKm:'Linhas', trackKm:'Trilha'
   }
 };
 // Export labels are always English (for the Pyka team)
 const EN = I18N.en;
 
+// Line icons (24×24, stroked with currentColor)
+const svg = d => `<svg viewBox="0 0 24 24" aria-hidden="true">${d}</svg>`;
+const ICONS = {
+  pole:     svg('<path d="M12 3v18M6 6.5h12M7.5 6.5v2M16.5 6.5v2M9 21h6"/>'),
+  tower:    svg('<path d="M8.5 21 12 3l3.5 18M6.5 8h11M10 13.5h4M9.2 17.5l5.6-4M14.8 17.5l-5.6-4"/>'),
+  guy:      svg('<path d="M8 3v18M8 4.5l10 14.5M15.5 21h5M5 21h6"/>'),
+  building: svg('<path d="M4 21V10l8-6 8 6v11M3 21h18M10 21v-5h4v5"/>'),
+  other:    svg('<path d="M12 4 21 20H3z"/><path d="M12 10v4.5M12 17.2v.1"/>'),
+  legacy:   svg('<circle cx="12" cy="12" r="6"/>'),
+};
+// silo / pivot / tree are retired from the palette but kept so older sessions still draw and export.
 const TYPES = [
-  { id:'pole',     color:'#ffd400', ic:'⚡' },
-  { id:'tower',    color:'#ff3b30', ic:'🗼', dark:true },
-  { id:'guy',      color:'#ff9500', ic:'⚓' },
-  { id:'silo',     color:'#bf5af2', ic:'🛢', dark:true },
-  { id:'building', color:'#aeb4bc', ic:'🏠' },
-  { id:'pivot',    color:'#3ea6ff', ic:'💧' },
-  { id:'tree',     color:'#30d158', ic:'🌳' },
-  { id:'other',    color:'#ffffff', ic:'⚠' },
+  { id:'pole',     color:'#f5c400' },
+  { id:'tower',    color:'#f0503c' },
+  { id:'guy',      color:'#f08c28' },
+  { id:'building', color:'#a9b3bd' },
+  { id:'other',    color:'#e8ecef' },
+  { id:'silo',     color:'#b07ae8', retired:true },
+  { id:'pivot',    color:'#4aa3f0', retired:true },
+  { id:'tree',     color:'#3fbf6a', retired:true },
 ];
+TYPES.forEach(ty => ty.svg = ICONS[ty.id] || ICONS.legacy);
 const TYPE = Object.fromEntries(TYPES.map(t => [t.id, t]));
 const LINE_COLORS = { power:'#ffd400', guy:'#ff9500' };
 const BUFFER_KM = 1.5;
@@ -187,7 +199,7 @@ function setBasemap(id, announce) {
   const bm = BASEMAPS.find(b => b.id === id) || BASEMAPS[0];
   baseLayers = bm.make(); baseLayers.forEach((l, i) => { l.addTo(map); if (i === 0) l.bringToBack(); });
   S.basemap = bm.id;
-  if (announce) toast('🛰 ' + (bm.name[S.lang] || bm.name.en));
+  if (announce) toast(bm.name[S.lang] || bm.name.en);
 }
 function nextBasemap() {
   const i = BASEMAPS.findIndex(b => b.id === S.basemap);
@@ -725,7 +737,7 @@ function openList() {
   [...S.features].reverse().forEach(f => {
     const ty = TYPE[f.type];
     const row = document.createElement('div'); row.className = 'li';
-    row.innerHTML = `<span class="swatch" style="background:${ty.color}"></span><div class="meta"><b>${t(f.type)}</b> ${f.height ? f.height + ' m' : ''}<br><span class="mono muted">${f.lat.toFixed(5)}, ${f.lon.toFixed(5)} · ±${fmt(f.acc, 0)} m · ${new Date(f.ts).toLocaleTimeString()}</span>${f.notes ? '<br>' + escapeHtml(f.notes) : ''}</div><button class="btn">◎</button>`;
+    row.innerHTML = `<span class="swatch" style="background:${ty.color}"></span><div class="meta"><b>${t(f.type)}</b> ${f.height ? f.height + ' m' : ''}<br><span class="mono muted">${f.lat.toFixed(5)}, ${f.lon.toFixed(5)} · ±${fmt(f.acc, 0)} m · ${new Date(f.ts).toLocaleTimeString()}</span>${f.notes ? '<br>' + escapeHtml(f.notes) : ''}</div><button class="btn icon" aria-label="Show on map">${svg('<circle cx="12" cy="12" r="7"/><path d="M12 2v3M12 19v3M2 12h3M19 12h3"/>')}</button>`;
     row.querySelector('button').onclick = () => { closeAllSheets(); map.setView([f.lat, f.lon], 19); setTimeout(() => markerById.get(f.id)?.fire('click'), 300); };
     body.appendChild(row);
   });
@@ -861,9 +873,9 @@ function drawBars() {
   const max = Math.max(1, ...Object.values(counts));
   const lineM = S.lines.reduce((a, l) => { const p = lineLatLngs(l); for (let i = 1; i < p.length; i++) a += turf.distance([p[i - 1][1], p[i - 1][0]], [p[i][1], p[i][0]], { units: 'meters' }); return a; }, 0);
   let html = `<div class="muted small">${t('byType')}</div>`;
-  for (const ty of TYPES) html += `<div class="bar"><span>${ty.ic} ${t(ty.id)}</span><div class="track"><div class="fill" style="width:${counts[ty.id] / max * 100}%;background:${ty.color}"></div></div><span class="n">${counts[ty.id]}</span></div>`;
-  html += `<div class="bar"><span>⟋ ${t('lineKm')}</span><span class="mono">${S.lines.length} · ${(lineM / 1000).toFixed(2)} km</span><span></span></div>`;
-  html += `<div class="bar"><span>⏺ ${t('trackKm')}</span><span class="mono">${(trackStats.m / 1000).toFixed(2)} km</span><span></span></div>`;
+  for (const ty of TYPES) if (!ty.retired || counts[ty.id]) html += `<div class="bar"><span><i class="sw" style="background:${ty.color}"></i>${t(ty.id)}</span><div class="track"><div class="fill" style="width:${counts[ty.id] / max * 100}%;background:${ty.color}"></div></div><span class="n">${counts[ty.id]}</span></div>`;
+  html += `<div class="bar"><span>${t('lineKm')}</span><span class="mono">${S.lines.length} · ${(lineM / 1000).toFixed(2)} km</span><span></span></div>`;
+  html += `<div class="bar"><span>${t('trackKm')}</span><span class="mono">${(trackStats.m / 1000).toFixed(2)} km</span><span></span></div>`;
   $('#statsBars').innerHTML = html;
   $$('[data-cnt]').forEach(el => { const n = counts[el.dataset.cnt]; el.textContent = n; el.classList.toggle('hidden', !n); });
 }
@@ -878,9 +890,9 @@ function applyLang() {
   $('#btnLang').textContent = S.lang === 'en' ? 'PT' : 'EN';
   $$('[data-i18n]').forEach(el => el.textContent = t(el.dataset.i18n));
   const pal = $('#palette'); pal.innerHTML = '';
-  TYPES.forEach(ty => {
-    const b = document.createElement('button'); b.className = 'pbtn' + (ty.dark ? ' darktext' : ''); b.style.background = ty.color;
-    b.innerHTML = `<span class="ic">${ty.ic}</span><span>${t(ty.id)}</span><span class="cnt hidden" data-cnt="${ty.id}"></span>`;
+  TYPES.filter(ty => !ty.retired).forEach(ty => {
+    const b = document.createElement('button'); b.className = 'pbtn'; b.style.setProperty('--c', ty.color);
+    b.innerHTML = `<span class="ic">${ty.svg}</span><span class="lb">${t(ty.id)}</span><span class="cnt hidden" data-cnt="${ty.id}"></span>`;
     b.onclick = () => openSheet(ty.id);
     pal.appendChild(b);
   });

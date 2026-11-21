@@ -21,16 +21,20 @@
   <div id="farmTitle" class="title"></div>
   <div id="recChip" class="chip rec hidden"><span class="recDot"></span><span id="recText">REC</span></div>
   <button id="btnLang" class="chip btn-chip">PT</button>
-  <button id="btnMenu" class="chip btn-chip" aria-label="menu">☰</button>
+  <button id="btnMenu" class="chip btn-chip" aria-label="Menu"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 7h16M4 12h16M4 17h16"/></svg></button>
 </header>
 
 <!-- Map side buttons -->
 <div id="sideBtns">
-  <button id="btnLocate" class="round" title="Center">◎</button>
-  <button id="btnBase" class="round" title="Map layer">🛰</button>
-  <button id="btnTrack" class="round" title="Track">⏺</button>
-  <button id="btnLine" class="round" title="Line">⟋</button>
-  <button id="btnUndo" class="round" title="Undo">↶</button>
+  <div class="group">
+    <button id="btnLocate" class="round" title="Center on me" aria-label="Center on me"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="7"/><circle cx="12" cy="12" r="2.2" class="fill"/><path d="M12 2v3M12 19v3M2 12h3M19 12h3"/></svg></button>
+    <button id="btnBase" class="round" title="Map layer" aria-label="Map layer"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="m12 3 9 5-9 5-9-5z"/><path d="m3 12.5 9 5 9-5"/><path d="m3 17 9 5 9-5" opacity=".55"/></svg></button>
+  </div>
+  <div class="group">
+    <button id="btnTrack" class="round" title="Record track" aria-label="Record track"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="8"/><circle cx="12" cy="12" r="3.5" class="fill"/></svg></button>
+    <button id="btnLine" class="round" title="Line mode" aria-label="Line mode"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 19 10 9l5 6 5-10"/><circle cx="4" cy="19" r="1.6" class="fill"/><circle cx="10" cy="9" r="1.6" class="fill"/><circle cx="15" cy="15" r="1.6" class="fill"/><circle cx="20" cy="5" r="1.6" class="fill"/></svg></button>
+    <button id="btnUndo" class="round" title="Undo" aria-label="Undo"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M9 14 4 9l5-5"/><path d="M4 9h10a6 6 0 0 1 0 12h-3"/></svg></button>
+  </div>
 </div>
 
 <!-- Line mode banner -->
@@ -49,7 +53,7 @@
 </div>
 
 <!-- Crosshair for map placement -->
-<div id="crosshair" class="hidden">+</div>
+<div id="crosshair" class="hidden"><svg viewBox="0 0 48 48" aria-hidden="true"><path d="M24 4v14M24 30v14M4 24h14M30 24h14"/><circle cx="24" cy="24" r="1.8"/></svg></div>
 
 <!-- Bottom type palette -->
 <nav id="palette"></nav>
@@ -59,7 +63,7 @@
   <div class="sheet-head">
     <span id="sheetSwatch" class="swatch"></span>
     <h2 id="sheetTitle"></h2>
-    <button id="btnSheetClose" class="x">✕</button>
+    <button id="btnSheetClose" class="x" aria-label="Close"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 6l12 12M18 6 6 18"/></svg></button>
   </div>
   <div class="tabs" id="methodTabs">
     <button data-m="gps" class="tab active" data-i18n="mGps"></button>
@@ -79,7 +83,7 @@
       <div id="avgStatus" class="mono">—</div>
       <div class="row">
         <button id="btnAvg" class="btn primary" data-i18n="startAvg"></button>
-        <select id="avgSecs"><option>5</option><option selected>10</option><option>20</option><option>30</option></select><span class="muted">s</span>
+        <select id="avgSecs"><option>5</option><option selected>10</option><option>20</option><option>30</option></select><span class="muted">sec</span>
       </div>
     </div>
   </div>
@@ -130,7 +134,7 @@
 
 <!-- Menu sheet -->
 <section id="menu" class="sheet hidden">
-  <div class="sheet-head"><h2 data-i18n="menu"></h2><button id="btnMenuClose" class="x">✕</button></div>
+  <div class="sheet-head"><h2 data-i18n="menu"></h2><button id="btnMenuClose" class="x" aria-label="Close"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 6l12 12M18 6 6 18"/></svg></button></div>
   <label><span data-i18n="farmName"></span><input id="inFarm" type="text"></label>
   <label><span data-i18n="operator"></span><input id="inOperator" type="text" placeholder="Ops Person A"></label>
   <label><span data-i18n="declination"></span><input id="inDecl" type="number" inputmode="decimal" step="0.1"></label>
@@ -151,12 +155,12 @@
 
 <!-- List sheet -->
 <section id="list" class="sheet hidden">
-  <div class="sheet-head"><h2 data-i18n="listFeatures"></h2><button id="btnListClose" class="x">✕</button></div>
+  <div class="sheet-head"><h2 data-i18n="listFeatures"></h2><button id="btnListClose" class="x" aria-label="Close"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 6l12 12M18 6 6 18"/></svg></button></div>
   <div id="listBody"></div>
 </section>
 
 <div id="toast" class="hidden"></div>
-<div id="flash" class="hidden"><div class="flashIc">✓</div><div id="flashTxt"></div></div>
+<div id="flash" class="hidden"><div class="flashIc"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="m5 12.5 4.5 4.5L19 7.5"/></svg></div><div id="flashTxt"></div></div>
 
 <script src="vendor/leaflet.js"></script>
 <script src="vendor/turf.min.js"></script>
