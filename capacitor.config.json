@@ -1,0 +1,6 @@
+{
+  "appId": "com.arcsxd.fieldscout",
+  "appName": "Field Scout",
+  "webDir": "www",
+  "ios": { "contentInset": "never" }
+}

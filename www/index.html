@@ -1,0 +1,143 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="theme-color" content="#0b0f14">
+<title>Field Scout</title>
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="apple-touch-icon" href="icon-512.png">
+<link rel="stylesheet" href="vendor/leaflet.css">
+<link rel="stylesheet" href="styles.css">
+</head>
+<body>
+<div id="map"></div>
+
+<!-- Top bar -->
+<header id="topbar">
+  <div id="gpsChip" class="chip"><span class="dot"></span><span id="gpsText">GPS…</span></div>
+  <div id="farmTitle" class="title"></div>
+  <button id="btnLang" class="chip btn-chip">PT</button>
+  <button id="btnMenu" class="chip btn-chip" aria-label="menu">☰</button>
+</header>
+
+<!-- Map side buttons -->
+<div id="sideBtns">
+  <button id="btnLocate" class="round" title="Center">◎</button>
+  <button id="btnTrack" class="round" title="Track">⏺</button>
+  <button id="btnLine" class="round" title="Line">⟋</button>
+  <button id="btnUndo" class="round" title="Undo">↶</button>
+</div>
+
+<!-- Line mode banner -->
+<div id="lineBanner" class="banner hidden">
+  <div><b id="lineBannerTitle"></b> <span id="lineBannerCount"></span></div>
+  <div class="row">
+    <button id="btnLineFinish" class="btn ok" data-i18n="finish"></button>
+    <button id="btnLineCancel" class="btn ghost" data-i18n="cancel"></button>
+  </div>
+</div>
+
+<!-- Tap-to-place banner -->
+<div id="tapBanner" class="banner hidden">
+  <div data-i18n="tapHint"></div>
+  <button id="btnTapCancel" class="btn ghost" data-i18n="cancel"></button>
+</div>
+
+<!-- Crosshair for map placement -->
+<div id="crosshair" class="hidden">+</div>
+
+<!-- Bottom type palette -->
+<nav id="palette"></nav>
+
+<!-- Capture sheet -->
+<section id="sheet" class="sheet hidden">
+  <div class="sheet-head">
+    <span id="sheetSwatch" class="swatch"></span>
+    <h2 id="sheetTitle"></h2>
+    <button id="btnSheetClose" class="x">✕</button>
+  </div>
+  <div class="tabs" id="methodTabs">
+    <button data-m="gps" class="tab active" data-i18n="mGps"></button>
+    <button data-m="map" class="tab" data-i18n="mMap"></button>
+    <button data-m="bearing" class="tab" data-i18n="mBearing"></button>
+  </div>
+
+  <div class="pane" data-pane="gps">
+    <div class="avgBox">
+      <div id="avgStatus" class="mono">—</div>
+      <div class="row">
+        <button id="btnAvg" class="btn primary" data-i18n="startAvg"></button>
+        <select id="avgSecs"><option>5</option><option selected>10</option><option>20</option><option>30</option></select><span class="muted">s</span>
+      </div>
+    </div>
+  </div>
+  <div class="pane hidden" data-pane="map">
+    <p class="muted" data-i18n="mapPaneHint"></p>
+    <button id="btnPickMap" class="btn primary" data-i18n="pickOnMap"></button>
+    <div id="mapPickStatus" class="mono"></div>
+  </div>
+  <div class="pane hidden" data-pane="bearing">
+    <p class="muted" data-i18n="bearingHint"></p>
+    <div class="grid2">
+      <label><span data-i18n="bearingTrue"></span><input id="inBearing" type="number" inputmode="decimal" step="1" min="0" max="360"></label>
+      <label><span data-i18n="distance"></span><input id="inDist" type="number" inputmode="decimal" step="1" min="0"></label>
+    </div>
+    <div class="row">
+      <button id="btnCompass" class="btn" data-i18n="useCompass"></button>
+      <span id="compassLive" class="mono"></span>
+    </div>
+    <div id="bearingStatus" class="mono"></div>
+  </div>
+
+  <div class="grid2">
+    <label><span data-i18n="height"></span><input id="inHeight" type="number" inputmode="decimal" step="0.5" min="0"></label>
+    <label><span data-i18n="width"></span><input id="inWidth" type="number" inputmode="decimal" step="0.5" min="0"></label>
+  </div>
+  <label><span data-i18n="notes"></span><textarea id="inNotes" rows="2"></textarea></label>
+  <div class="row">
+    <label class="btn file"><span data-i18n="addPhoto"></span><input id="inPhoto" type="file" accept="image/*" capture="environment" hidden></label>
+    <div id="photoThumbs" class="thumbs"></div>
+  </div>
+  <div class="row end">
+    <button id="btnSave" class="btn ok big" data-i18n="save" disabled></button>
+  </div>
+</section>
+
+<!-- Menu sheet -->
+<section id="menu" class="sheet hidden">
+  <div class="sheet-head"><h2 data-i18n="menu"></h2><button id="btnMenuClose" class="x">✕</button></div>
+  <label><span data-i18n="farmName"></span><input id="inFarm" type="text"></label>
+  <label><span data-i18n="operator"></span><input id="inOperator" type="text" placeholder="Ops Person A"></label>
+  <label><span data-i18n="declination"></span><input id="inDecl" type="number" inputmode="decimal" step="0.1"></label>
+  <div class="menuList">
+    <label class="btn file"><span data-i18n="importKml"></span><input id="inKml" type="file" accept=".kml,.kmz,application/vnd.google-earth.kml+xml,application/vnd.google-earth.kmz" hidden></label>
+    <button id="btnClearFarm" class="btn ghost" data-i18n="clearFarm"></button>
+    <button id="btnExportKmz" class="btn primary" data-i18n="exportKmz"></button>
+    <button id="btnExportKml" class="btn" data-i18n="exportKml"></button>
+    <button id="btnExportCsv" class="btn" data-i18n="exportCsv"></button>
+    <button id="btnList" class="btn" data-i18n="listFeatures"></button>
+    <button id="btnLayer" class="btn" data-i18n="toggleLayer"></button>
+    <button id="btnNew" class="btn danger" data-i18n="newSession"></button>
+  </div>
+  <div id="stats" class="mono muted"></div>
+  <p class="muted small">Field Scout v1.0 · Pyka mapping Step 4</p>
+</section>
+
+<!-- List sheet -->
+<section id="list" class="sheet hidden">
+  <div class="sheet-head"><h2 data-i18n="listFeatures"></h2><button id="btnListClose" class="x">✕</button></div>
+  <div id="listBody"></div>
+</section>
+
+<div id="toast" class="hidden"></div>
+
+<script src="vendor/leaflet.js"></script>
+<script src="vendor/turf.min.js"></script>
+<script src="vendor/togeojson.umd.js"></script>
+<script src="vendor/jszip.min.js"></script>
+<script src="app.js"></script>
+</body>
+</html>
