@@ -17,6 +17,12 @@
 }
 *{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
 html,body{margin:0;height:100%;background:var(--bg);color:var(--text);font:15px/1.4 var(--font);overflow:hidden;-webkit-font-smoothing:antialiased}
+body{position:relative}
+/* iPhone home-screen app with a translucent status bar: iOS reports the viewport one status bar
+   too short, leaving a black band at the bottom. 100vh there is the full screen, so size the app
+   with it. Only in standalone mode: in a Safari tab 100vh would push the bar under the toolbar. */
+html.standalone,html.standalone body{height:100vh}
+@media (display-mode:standalone){html,body{height:100vh}}
 button{font:inherit;color:inherit;cursor:pointer}
 button:focus-visible,input:focus-visible,select:focus-visible,textarea:focus-visible,.photoAdd:focus-within,.rowBtn:focus-within{outline:2px solid var(--blue);outline-offset:2px}
 svg[aria-hidden]{width:22px;height:22px;fill:none;stroke:currentColor;stroke-width:1.75;stroke-linecap:round;stroke-linejoin:round;display:block;flex:none}
