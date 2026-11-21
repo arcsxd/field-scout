@@ -108,7 +108,7 @@ const DB = (() => {
     return new Promise((res, rej) => {
       const t = d.transaction(store, mode); const s = t.objectStore(store);
       const out = fn(s);
-      t.oncomplete = () => res(out && out.result !== undefined ? out.result : out);
+      t.oncomplete = () => res(out instanceof IDBRequest ? out.result : out);
       t.onerror = () => rej(t.error);
     });
   }
@@ -122,7 +122,7 @@ const DB = (() => {
 
 // ---------------------------------------------------------------- state
 const S = {
-  lang: 'en',
+  lang: 'en', basemap: 'sat',
   farm: '', operator: '', decl: 0,
   features: [],   // {id,type,lat,lon,acc,method,height,width,notes,photos:[ids],lineId,ts,op}
   lines: [],      // {id,kind,pointIds:[],ts,op}
@@ -168,13 +168,32 @@ const CachedLayer = L.TileLayer.extend({
     return img;
   }
 });
-const layers = [
-  new CachedLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}',
-    { maxNativeZoom: 18, maxZoom: 21, cacheKey: 'esri', attribution: 'Imagery © Esri, Maxar, Earthstar' }),
-  new CachedLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png',
-    { maxNativeZoom: 19, maxZoom: 21, cacheKey: 'osm', attribution: '© OpenStreetMap' }),
+const ESRI = 'https://server.arcgisonline.com/ArcGIS/rest/services/';
+const mk = (url, key, attr, o = {}) => new CachedLayer(url, Object.assign({ maxNativeZoom: 18, maxZoom: 21, cacheKey: key, attribution: attr }, o));
+const imagery = () => mk(ESRI + 'World_Imagery/MapServer/tile/{z}/{y}/{x}', 'esri', 'Imagery © Esri, Maxar, Earthstar');
+const BASEMAPS = [
+  { id: 'sat',    name: { en: 'Satellite', pt: 'Satélite' }, make: () => [imagery()] },
+  { id: 'hybrid', name: { en: 'Satellite + roads & names', pt: 'Satélite + estradas e nomes' }, make: () => [
+      imagery(),
+      mk(ESRI + 'Reference/World_Transportation/MapServer/tile/{z}/{y}/{x}', 'esri-roads', '', { maxNativeZoom: 19 }),
+      mk(ESRI + 'Reference/World_Boundaries_and_Places/MapServer/tile/{z}/{y}/{x}', 'esri-places', '', { maxNativeZoom: 19 })] },
+  { id: 'clarity', name: { en: 'Satellite (Clarity, sharper)', pt: 'Satélite (Clarity, mais nítido)' }, make: () => [
+      mk('https://clarity.maptiles.arcgis.com/arcgis/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}', 'esri-clarity', 'Imagery © Esri Clarity', { maxNativeZoom: 19 })] },
+  { id: 'osm',    name: { en: 'Street map', pt: 'Mapa de ruas' }, make: () => [mk('https://tile.openstreetmap.org/{z}/{x}/{y}.png', 'osm', '© OpenStreetMap', { maxNativeZoom: 19 })] },
 ];
-let layerIdx = 0; layers[0].addTo(map);
+let baseLayers = [];
+function setBasemap(id, announce) {
+  baseLayers.forEach(l => map.removeLayer(l));
+  const bm = BASEMAPS.find(b => b.id === id) || BASEMAPS[0];
+  baseLayers = bm.make(); baseLayers.forEach((l, i) => { l.addTo(map); if (i === 0) l.bringToBack(); });
+  S.basemap = bm.id;
+  if (announce) toast('🛰 ' + (bm.name[S.lang] || bm.name.en));
+}
+function nextBasemap() {
+  const i = BASEMAPS.findIndex(b => b.id === S.basemap);
+  setBasemap(BASEMAPS[(i + 1) % BASEMAPS.length].id, true); persist();
+}
+setBasemap('sat');
 
 const gFarm = L.layerGroup().addTo(map);
 const gTrack = L.layerGroup().addTo(map);
@@ -897,7 +916,8 @@ function wire() {
   $('#btnExportKmz').onclick = exportKmz;
   $('#btnExportCsv').onclick = exportCsv;
   $('#btnList').onclick = openList;
-  $('#btnLayer').onclick = () => { map.removeLayer(layers[layerIdx]); layerIdx = (layerIdx + 1) % layers.length; layers[layerIdx].addTo(map).bringToBack(); };
+  $('#btnLayer').onclick = nextBasemap;
+  $('#btnBase').onclick = nextBasemap;
   $('#btnNew').onclick = async () => {
     if (!confirm(t('confirmNew'))) return;
     if (tracking) await setTracking(false);
@@ -915,6 +935,7 @@ function wire() {
     else if (/^pt/i.test(navigator.language)) S.lang = 'en'; // English default by request
   } catch (e) { console.warn(e); }
   recomputeTrackStats();
+  if (S.basemap && S.basemap !== 'sat') setBasemap(S.basemap);
   wire(); applyLang(); drawFarm(); drawTrack(); refreshAll();
   if (S.features.length) map.fitBounds(L.featureGroup([...markerById.values()]).getBounds(), { padding: [40, 40], maxZoom: 17 });
   else if (farmPolys) map.fitBounds(L.geoJSON(S.farmGeo).getBounds());
