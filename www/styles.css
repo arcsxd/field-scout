@@ -10,6 +10,7 @@
   --mono:ui-monospace,"SF Mono",SFMono-Regular,Menlo,Consolas,monospace;
   --safe-top:env(safe-area-inset-top,0px); --safe-bot:env(safe-area-inset-bottom,0px);
   --shadow:0 4px 18px rgba(0,0,0,.45);
+  --ease-out:cubic-bezier(.22,1,.36,1); --spring:cubic-bezier(.34,1.56,.64,1);
   color-scheme:dark;
 }
 *{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
@@ -64,9 +65,10 @@ svg[aria-hidden] .fill{fill:currentColor;stroke:none}
 .x{background:var(--panel2);border:0;color:var(--muted);width:30px;height:30px;border-radius:50%;display:grid;place-items:center}
 .x svg{width:16px;height:16px;stroke-width:2.2}
 .swatch{width:12px;height:12px;border-radius:50%;flex:none;box-shadow:0 0 0 3px rgba(255,255,255,.08)}
-.tabs{display:flex;background:var(--bg);border:1px solid var(--line);border-radius:var(--r-sm);padding:3px;gap:3px}
-.tab{flex:1;border:0;background:none;color:var(--muted);padding:8px 4px;border-radius:7px;font-weight:600;font-size:13.5px}
-.tab.active{background:var(--panel2);color:var(--text);box-shadow:0 1px 2px rgba(0,0,0,.4)}
+.tabs{position:relative;display:flex;background:var(--bg);border:1px solid var(--line);border-radius:var(--r-sm);padding:3px;gap:3px}
+.tabInd{position:absolute;left:0;top:3px;bottom:3px;width:0;border-radius:7px;background:var(--panel2);box-shadow:0 1px 2px rgba(0,0,0,.4);transition:transform .32s var(--ease-out),width .32s var(--ease-out)}
+.tab{position:relative;z-index:1;flex:1;border:0;background:none;color:var(--muted);padding:8px 4px;border-radius:7px;font-weight:600;font-size:13.5px;transition:color .2s}
+.tab.active{color:var(--text)}
 .pane{display:flex;flex-direction:column;gap:8px}
 .pane p{margin:0;font-size:13.5px;line-height:1.45}
 .avgBox{background:var(--bg);border:1px solid var(--line);border-radius:var(--r);padding:12px;display:flex;flex-direction:column;gap:10px}
@@ -164,9 +166,62 @@ select{width:auto}
 .bar > span:first-child{display:flex;align-items:center;gap:8px}
 .bar .sw{width:8px;height:8px;border-radius:50%;flex:none}
 .bar .track{height:6px;background:var(--panel2);border-radius:3px;overflow:hidden}
-.bar .fill{height:100%;border-radius:3px;transition:width .4s}
+.bar .fill{height:100%;border-radius:3px;transform-origin:left center}
 .bar .n{text-align:right;font-weight:600;font-variant-numeric:tabular-nums}
 body:has(#recChip:not(.hidden)) #farmTitle{display:none}
 body:has(#recChip:not(.hidden)) #recChip{flex:1;justify-content:center}
+
+/* ---------- motion ----------
+   One language throughout: things rise into place with a soft ease-out, confirmations get a small spring. */
+@keyframes rise{from{opacity:0;transform:translateY(14px)}to{opacity:1;transform:none}}
+@keyframes drop{from{opacity:0;transform:translateY(-10px)}to{opacity:1;transform:none}}
+@keyframes slideL{from{opacity:0;transform:translateX(16px)}to{opacity:1;transform:none}}
+@keyframes fadeIn{from{opacity:0}to{opacity:1}}
+@keyframes sheetIn{from{transform:translateY(100%)}to{transform:none}}
+@keyframes popIn{from{opacity:0;transform:scale(.94) translateY(6px)}to{opacity:1;transform:none}}
+@keyframes toastIn{from{opacity:0;transform:translate(-50%,12px) scale(.96)}to{opacity:1;transform:translate(-50%,0)}}
+@keyframes growX{from{transform:scaleX(0)}to{transform:scaleX(1)}}
+@keyframes bump{0%{transform:scale(1)}40%{transform:scale(1.35)}100%{transform:scale(1)}}
+@keyframes halo{0%{transform:scale(1);opacity:.7}100%{transform:scale(3.4);opacity:0}}
+@keyframes breathe{0%,100%{box-shadow:0 0 0 0 rgba(52,199,123,.55)}60%{box-shadow:0 0 0 5px rgba(52,199,123,0)}}
+@keyframes recBeat{0%,100%{transform:scale(1)}50%{transform:scale(.82)}}
+@keyframes draw{from{stroke-dashoffset:40}to{stroke-dashoffset:0}}
+@keyframes xIn{from{opacity:0;transform:scale(1.6) rotate(45deg)}to{opacity:1;transform:none}}
+
+/* app open */
+#topbar>*{animation:drop .5s var(--ease-out) backwards}
+#topbar>:nth-child(2){animation-delay:.04s} #topbar>:nth-child(4){animation-delay:.08s} #topbar>:nth-child(5){animation-delay:.12s}
+#sideBtns .group{animation:slideL .5s var(--ease-out) backwards;animation-delay:.12s}
+#sideBtns .group+.group{animation-delay:.2s}
+#palette{animation:sheetIn .45s var(--ease-out) backwards}
+.pbtn{animation:rise .45s var(--ease-out) backwards;animation-delay:calc(var(--i,0) * 45ms + 150ms)}
+.pbtn .ic{transition:transform .25s var(--spring),background .2s}
+.pbtn:active .ic{transform:scale(1.12)}
+.pbtn .cnt.bump{animation:bump .45s var(--spring)}
+
+/* sheets, banners, dialogs */
+.sheet:not(.hidden){animation:sheetIn .42s var(--ease-out)}
+.sheet:not(.hidden)>*{animation:rise .42s var(--ease-out) backwards}
+.sheet>:nth-child(2){animation-delay:.03s} .sheet>:nth-child(3){animation-delay:.06s} .sheet>:nth-child(4){animation-delay:.09s}
+.sheet>:nth-child(5){animation-delay:.12s} .sheet>:nth-child(6){animation-delay:.15s} .sheet>:nth-child(7){animation-delay:.18s}
+.sheet>:nth-child(n+8){animation-delay:.21s}
+.pane:not(.hidden){animation:fadeIn .25s ease-out}
+.warn:not(.hidden){animation:rise .3s var(--ease-out)}
+.banner:not(.hidden){animation:drop .35s var(--ease-out)}
+#toast:not(.hidden){animation:toastIn .32s var(--spring)}
+.leaflet-popup-content-wrapper{animation:popIn .24s var(--ease-out);transform-origin:50% 100%}
+#crosshair:not(.hidden) svg{animation:xIn .4s var(--spring)}
+.li{animation:rise .38s var(--ease-out) backwards;animation-delay:calc(var(--i,0) * 30ms + 60ms)}
+.bar .fill{animation:growX .7s var(--ease-out) backwards;animation-delay:.2s}
+.btn,.round,.x{transition:transform .12s ease-out,background .15s,color .15s,opacity .2s}
+.btn:active:not(:disabled),.x:active{transform:scale(.96)}
+
+/* live state */
+.me-marker{position:relative}
+.me-marker::after{content:"";position:absolute;inset:-3px;border-radius:50%;border:2px solid var(--blue);animation:halo 2.4s ease-out infinite}
+.dot.good{animation:breathe 2.6s ease-in-out infinite}
+.round.on svg .fill{transform-origin:12px 12px;animation:recBeat 1.2s ease-in-out infinite}
+.round.on-line svg path{stroke-dasharray:40;animation:draw .7s var(--ease-out)}
+.round:active svg{transform:scale(.88);transition:transform .1s}
 
 @media (prefers-reduced-motion:reduce){*,*::before,*::after{animation-duration:.01ms!important;transition-duration:.01ms!important}}

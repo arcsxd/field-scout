@@ -7,7 +7,7 @@
 const I18N = {
   en: {
     pole:'Power pole', tower:'Tower', guy:'Guy anchor', silo:'Silo', building:'Building',
-    pivot:'Irrigation', tree:'Tree', other:'Other',
+    pivot:'Pivot', tree:'Tree', other:'Other',
     lineKind_power:'Power line', lineKind_guy:'Guy wire',
     finish:'Finish', cancel:'Cancel', save:'Save', menu:'Menu',
     tapHint:'Move the map so the + is on the obstacle, then tap the map.',
@@ -39,7 +39,7 @@ const I18N = {
   },
   pt: {
     pole:'Poste', tower:'Torre', guy:'Âncora estai', silo:'Silo', building:'Edificação',
-    pivot:'Irrigação', tree:'Árvore', other:'Outro',
+    pivot:'Pivô', tree:'Árvore', other:'Outro',
     lineKind_power:'Linha de energia', lineKind_guy:'Cabo de estai',
     finish:'Concluir', cancel:'Cancelar', save:'Salvar', menu:'Menu',
     tapHint:'Mova o mapa até o + ficar sobre o obstáculo e toque no mapa.',
@@ -79,19 +79,20 @@ const ICONS = {
   pole:     svg('<path d="M12 3v18M6 6.5h12M7.5 6.5v2M16.5 6.5v2M9 21h6"/>'),
   tower:    svg('<path d="M8.5 21 12 3l3.5 18M6.5 8h11M10 13.5h4M9.2 17.5l5.6-4M14.8 17.5l-5.6-4"/>'),
   guy:      svg('<path d="M8 3v18M8 4.5l10 14.5M15.5 21h5M5 21h6"/>'),
+  pivot:    svg('<circle cx="12" cy="12" r="8.5"/><path d="M12 12l6-6"/><circle cx="12" cy="12" r="1.7" class="fill"/><circle cx="14.2" cy="9.8" r="1" class="fill"/><circle cx="16.2" cy="7.8" r="1" class="fill"/>'),
   building: svg('<path d="M4 21V10l8-6 8 6v11M3 21h18M10 21v-5h4v5"/>'),
   other:    svg('<path d="M12 4 21 20H3z"/><path d="M12 10v4.5M12 17.2v.1"/>'),
   legacy:   svg('<circle cx="12" cy="12" r="6"/>'),
 };
-// silo / pivot / tree are retired from the palette but kept so older sessions still draw and export.
+// guy / silo / tree are retired from the palette but kept so older sessions still draw and export.
 const TYPES = [
   { id:'pole',     color:'#f5c400' },
   { id:'tower',    color:'#f0503c' },
-  { id:'guy',      color:'#f08c28' },
+  { id:'pivot',    color:'#4aa3f0' },
   { id:'building', color:'#a9b3bd' },
   { id:'other',    color:'#e8ecef' },
+  { id:'guy',      color:'#f08c28', retired:true },
   { id:'silo',     color:'#b07ae8', retired:true },
-  { id:'pivot',    color:'#4aa3f0', retired:true },
   { id:'tree',     color:'#3fbf6a', retired:true },
 ];
 TYPES.forEach(ty => ty.svg = ICONS[ty.id] || ICONS.legacy);
@@ -459,7 +460,7 @@ function openSheet(type, editing = null) {
   $('#inBearing').value = ''; $('#inDist').value = '';
   resetCaptureVisuals();
   renderThumbs(); setMethod(editing ? (editing.method.split('+')[0] || 'gps') : 'gps');
-  $('#sheet').classList.remove('hidden'); $('#lineBanner').classList.add('hidden');
+  $('#sheet').classList.remove('hidden'); $('#lineBanner').classList.add('hidden'); moveTabInd();
   updateSaveBtn();
   // auto-start averaging for fast pole capture
   if (!editing) startAvg();
@@ -469,8 +470,14 @@ function setMethod(m) {
   cap.method = m;
   $$('#methodTabs .tab').forEach(b => b.classList.toggle('active', b.dataset.m === m));
   $$('#sheet .pane').forEach(p => p.classList.toggle('hidden', p.dataset.pane !== m));
+  moveTabInd();
   if (m !== 'gps') stopAvg();
   if (m === 'bearing') prepBearing();
+}
+function moveTabInd() {
+  const a = $('#methodTabs .tab.active'), ind = $('#methodTabs .tabInd');
+  if (!a || !ind || !a.offsetWidth) return;
+  ind.style.width = a.offsetWidth + 'px'; ind.style.transform = 'translateX(' + a.offsetLeft + 'px)';
 }
 function updateSaveBtn() { $('#btnSave').disabled = !(cap && cap.pos); }
 function closeAllSheets() { ['#sheet', '#menu', '#list'].forEach(s => $(s).classList.add('hidden')); if (lineMode) $('#lineBanner').classList.remove('hidden'); stopAvg(); stopCompass(); cancelTapPick(); clearPreview(); }
@@ -734,9 +741,9 @@ function updateStats() {
 function openList() {
   closeAllSheets();
   const body = $('#listBody'); body.innerHTML = '';
-  [...S.features].reverse().forEach(f => {
+  [...S.features].reverse().forEach((f, i) => {
     const ty = TYPE[f.type];
-    const row = document.createElement('div'); row.className = 'li';
+    const row = document.createElement('div'); row.className = 'li'; row.style.setProperty('--i', Math.min(i, 12));
     row.innerHTML = `<span class="swatch" style="background:${ty.color}"></span><div class="meta"><b>${t(f.type)}</b> ${f.height ? f.height + ' m' : ''}<br><span class="mono muted">${f.lat.toFixed(5)}, ${f.lon.toFixed(5)} · ±${fmt(f.acc, 0)} m · ${new Date(f.ts).toLocaleTimeString()}</span>${f.notes ? '<br>' + escapeHtml(f.notes) : ''}</div><button class="btn icon" aria-label="Show on map">${svg('<circle cx="12" cy="12" r="7"/><path d="M12 2v3M12 19v3M2 12h3M19 12h3"/>')}</button>`;
     row.querySelector('button').onclick = () => { closeAllSheets(); map.setView([f.lat, f.lon], 19); setTimeout(() => markerById.get(f.id)?.fire('click'), 300); };
     body.appendChild(row);
@@ -877,7 +884,11 @@ function drawBars() {
   html += `<div class="bar"><span>${t('lineKm')}</span><span class="mono">${S.lines.length} · ${(lineM / 1000).toFixed(2)} km</span><span></span></div>`;
   html += `<div class="bar"><span>${t('trackKm')}</span><span class="mono">${(trackStats.m / 1000).toFixed(2)} km</span><span></span></div>`;
   $('#statsBars').innerHTML = html;
-  $$('[data-cnt]').forEach(el => { const n = counts[el.dataset.cnt]; el.textContent = n; el.classList.toggle('hidden', !n); });
+  $$('[data-cnt]').forEach(el => {
+    const n = counts[el.dataset.cnt], changed = el.textContent !== String(n);
+    el.textContent = n; el.classList.toggle('hidden', !n);
+    if (changed && n) { el.classList.remove('bump'); void el.offsetWidth; el.classList.add('bump'); }
+  });
 }
 function recomputeTrackStats() {
   trackStats.m = 0; let prev = null;
@@ -890,8 +901,8 @@ function applyLang() {
   $('#btnLang').textContent = S.lang === 'en' ? 'PT' : 'EN';
   $$('[data-i18n]').forEach(el => el.textContent = t(el.dataset.i18n));
   const pal = $('#palette'); pal.innerHTML = '';
-  TYPES.filter(ty => !ty.retired).forEach(ty => {
-    const b = document.createElement('button'); b.className = 'pbtn'; b.style.setProperty('--c', ty.color);
+  TYPES.filter(ty => !ty.retired).forEach((ty, i) => {
+    const b = document.createElement('button'); b.className = 'pbtn'; b.style.setProperty('--c', ty.color); b.style.setProperty('--i', i);
     b.innerHTML = `<span class="ic">${ty.svg}</span><span class="lb">${t(ty.id)}</span><span class="cnt hidden" data-cnt="${ty.id}"></span>`;
     b.onclick = () => openSheet(ty.id);
     pal.appendChild(b);
