@@ -20,7 +20,9 @@ const I18N = {
     importKml:'Import farm KML/KMZ (spray areas)', clearFarm:'Remove farm boundaries',
     exportKmz:'Export KMZ (with photos)', exportKml:'Export KML', exportCsv:'Export CSV',
     listFeatures:'Obstacle list', toggleLayer:'Switch map layer', newSession:'New session (erase all)',
-    gpsWait:'GPS…', gpsNone:'No GPS', samples:'samples', spread:'spread',
+    gpsWait:'GPS…', gpsNone:'No GPS', gpsOff:'Off', gpsDeniedTitle:'Location is blocked',
+    gpsDeniedIos:'iPhone: Settings → Privacy & Security → Location Services → Safari Websites → While Using the App. Also check aA → Website Settings → Location → Allow.',
+    gpsDeniedOther:'Allow location for this site in the browser settings, then tap Try again.', gpsUnavail:'No GPS signal yet. Move to open sky.', retry:'Try again', samples:'samples', spread:'spread',
     saved:'Saved', deleted:'Deleted', undone:'Undone', nothingUndo:'Nothing to undo',
     trackOn:'Track recording ON', trackOff:'Track recording OFF',
     lineStart:'Line mode: every pole you save is added to this line',
@@ -55,7 +57,9 @@ const I18N = {
     importKml:'Importar KML/KMZ da fazenda (áreas)', clearFarm:'Remover limites da fazenda',
     exportKmz:'Exportar KMZ (com fotos)', exportKml:'Exportar KML', exportCsv:'Exportar CSV',
     listFeatures:'Lista de obstáculos', toggleLayer:'Trocar camada do mapa', newSession:'Nova sessão (apaga tudo)',
-    gpsWait:'GPS…', gpsNone:'Sem GPS', samples:'amostras', spread:'dispersão',
+    gpsWait:'GPS…', gpsNone:'Sem GPS', gpsOff:'Desligado', gpsDeniedTitle:'Localização bloqueada',
+    gpsDeniedIos:'iPhone: Ajustes → Privacidade e Segurança → Serviços de Localização → Sites do Safari → Durante o Uso do App. Confira também aA → Ajustes do Site → Localização → Permitir.',
+    gpsDeniedOther:'Permita a localização para este site nos ajustes do navegador e toque em Tentar de novo.', gpsUnavail:'Ainda sem sinal de GPS. Vá para céu aberto.', retry:'Tentar de novo', samples:'amostras', spread:'dispersão',
     saved:'Salvo', deleted:'Apagado', undone:'Desfeito', nothingUndo:'Nada para desfazer',
     trackOn:'Gravando trilha', trackOff:'Trilha parada',
     lineStart:'Modo linha: cada ponto salvo entra nesta linha',
@@ -231,6 +235,7 @@ const meAcc = L.circle([0, 0], { radius: 1, color: '#4aa3f0', weight: 1, opacity
 
 function onPos(p) {
   fix = { lat: p.coords.latitude, lon: p.coords.longitude, acc: p.coords.accuracy, ts: p.timestamp || Date.now() };
+  gpsDenied = false; $('#gpsBanner').classList.add('hidden');
   meMarker.setLatLng([fix.lat, fix.lon]); meAcc.setLatLng([fix.lat, fix.lon]).setRadius(fix.acc);
   if (!gMe.hasLayer(meMarker)) { gMe.addLayer(meAcc); gMe.addLayer(meMarker); }
   if (firstFix) { firstFix = false; map.setView([fix.lat, fix.lon], 17); }
@@ -241,10 +246,32 @@ function onPos(p) {
   updateBand(); updateRec();
   if (tracking && !nativeBg) addTrackPoint(fix);
 }
-function onPosErr(e) { $('#gpsText').textContent = t('gpsNone'); $('#gpsChip .dot').className = 'dot bad'; console.warn(e); }
+let gpsWatch = null, gpsDenied = false;
+function onPosErr(e) {
+  console.warn(e);
+  $('#gpsChip .dot').className = 'dot bad';
+  const denied = gpsDenied = !!(e && e.code === 1);
+  $('#gpsText').textContent = denied ? t('gpsOff') : t('gpsNone');
+  if (denied) showGpsHelp();
+  else if (!fix) toast(t('gpsUnavail'), 3000);
+}
+// Location was refused (or never asked because the OS blocks it): explain how to allow it.
+function showGpsHelp() {
+  const ios = /iPhone|iPad|iPod/.test(navigator.userAgent) || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
+  $('#gpsHelpText').textContent = ios ? t('gpsDeniedIos') : t('gpsDeniedOther');
+  $('#gpsBanner').classList.remove('hidden');
+}
+function restartGps() {
+  $('#gpsBanner').classList.add('hidden');
+  $('#gpsText').textContent = t('gpsWait'); $('#gpsChip .dot').className = 'dot';
+  if (gpsWatch != null) navigator.geolocation.clearWatch(gpsWatch);
+  // a call made straight from a tap is the most reliable way to make Safari show its prompt
+  navigator.geolocation.getCurrentPosition(onPos, onPosErr, { enableHighAccuracy: true, timeout: 30000 });
+  gpsWatch = navigator.geolocation.watchPosition(onPos, onPosErr, { enableHighAccuracy: true, maximumAge: 0, timeout: 30000 });
+}
 function startGps() {
   if (!('geolocation' in navigator)) return onPosErr('no geolocation');
-  navigator.geolocation.watchPosition(onPos, onPosErr, { enableHighAccuracy: true, maximumAge: 0, timeout: 30000 });
+  gpsWatch = navigator.geolocation.watchPosition(onPos, onPosErr, { enableHighAccuracy: true, maximumAge: 0, timeout: 30000 });
 }
 
 // ---------------------------------------------------------------- track recording (background-capable in native app)
@@ -926,7 +953,8 @@ function applyLang() {
     pal.appendChild(b);
   });
   updateLineBanner(); updateStats();
-  if (!fix) $('#gpsText').textContent = t('gpsWait');
+  if (!fix) $('#gpsText').textContent = t(gpsDenied ? 'gpsOff' : 'gpsWait');
+  if (!$('#gpsBanner').classList.contains('hidden')) showGpsHelp();
 }
 function wire() {
   $('#btnLang').onclick = () => { S.lang = S.lang === 'en' ? 'pt' : 'en'; applyLang(); persist(); };
@@ -937,6 +965,9 @@ function wire() {
   $('#inFarm').oninput = e => { S.farm = e.target.value; $('#farmTitle').textContent = S.farm; persist(); };
   $('#inOperator').oninput = e => { S.operator = e.target.value; persist(); };
   $('#inDecl').oninput = e => { S.decl = parseFloat(e.target.value) || 0; persist(); };
+  $('#gpsChip').onclick = () => fix ? map.setView([fix.lat, fix.lon], Math.max(map.getZoom(), 17)) : restartGps();
+  $('#btnGpsRetry').onclick = restartGps;
+  $('#btnGpsClose').onclick = () => $('#gpsBanner').classList.add('hidden');
   $('#btnLocate').onclick = () => fix ? map.setView([fix.lat, fix.lon], Math.max(map.getZoom(), 17)) : toast(t('noFix'));
   $('#btnTrack').onclick = () => setTracking(!tracking);
   $('#btnLine').onclick = startLine;
