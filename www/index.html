@@ -81,6 +81,7 @@
     <div class="headTxt"><h2 id="sheetTitle"></h2><span id="sheetSub"></span></div>
     <button id="btnSheetClose" class="x" aria-label="Close"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 6l12 12M18 6 6 18"/></svg></button>
   </div>
+  <div id="sheetTypePick" class="hidden"></div>
   <div class="tabs" id="methodTabs">
     <span class="tabInd" aria-hidden="true"></span>
     <button data-m="gps" class="tab active" data-i18n="mGps"></button>
@@ -182,6 +183,12 @@
     <label><span data-i18n="declination"></span><div class="unit"><input id="inDecl" type="number" inputmode="decimal" step="0.1"><i>°</i></div></label>
   </div>
 
+  <h3 class="secTitle" data-i18n="secImport"></h3>
+  <div class="card rows">
+    <label class="rowBtn"><span class="rIc"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3v11M7 9l5 5 5-5"/><circle cx="6" cy="19" r="1.6" class="fill"/><circle cx="12" cy="19" r="1.6" class="fill"/><circle cx="18" cy="19" r="1.6" class="fill"/></svg></span><span data-i18n="importObs"></span><svg viewBox="0 0 24 24" aria-hidden="true" class="chev"><path d="m9 6 6 6-6 6"/></svg><input id="inObsKml" type="file" accept=".kml,.kmz,application/vnd.google-earth.kml+xml,application/vnd.google-earth.kmz" hidden></label>
+    <button id="btnReview" class="rowBtn hidden"><span class="rIc"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 6h10M4 12h7M4 18h6"/><path d="m14 16 2.5 2.5L21 14"/></svg></span><span data-i18n="reviewImport"></span><em id="reviewBadge" class="badge hidden"></em><svg viewBox="0 0 24 24" aria-hidden="true" class="chev"><path d="m9 6 6 6-6 6"/></svg></button>
+  </div>
+
   <h3 class="secTitle" data-i18n="secFarm"></h3>
   <div class="card rows">
     <label class="rowBtn"><span class="rIc"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 6.5 9 4l6 2.5L20 4v13.5L15 20l-6-2.5L4 20z"/><path d="M9 4v13.5M15 6.5V20"/></svg></span><span data-i18n="importKml"></span><svg viewBox="0 0 24 24" aria-hidden="true" class="chev"><path d="m9 6 6 6-6 6"/></svg><input id="inKml" type="file" accept=".kml,.kmz,application/vnd.google-earth.kml+xml,application/vnd.google-earth.kmz" hidden></label>
@@ -195,6 +202,15 @@
   </div>
 
   <button id="btnNew" class="btn danger wide" data-i18n="newSession"></button>
+</section>
+
+<!-- Review imported obstacles -->
+<section id="review" class="sheet hidden">
+  <div class="sheet-head"><div class="headTxt"><h2 data-i18n="reviewTitle"></h2><span id="reviewSub"></span><span id="reviewNote" class="hidden"></span></div><button id="btnReviewClose" class="x" aria-label="Close"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 6l12 12M18 6 6 18"/></svg></button></div>
+  <div class="filt"><button id="fTodo" type="button"></button><button id="fAll" type="button"></button></div>
+  <div id="reviewBulk" class="bulk hidden"><span data-i18n="bulkLbl"></span><div id="bulkPick"></div></div>
+  <div id="reviewBody"></div>
+  <div class="saveBar"><button id="btnReviewDone" class="btn primary big" data-i18n="done"></button></div>
 </section>
 
 <!-- List sheet -->
