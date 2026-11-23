@@ -50,6 +50,8 @@ svg[aria-hidden] .fill{fill:currentColor;stroke:none}
 #map3d{position:absolute;inset:0;z-index:1;background:var(--mapbg)}
 .round.txt{font-size:13.5px;font-weight:800;letter-spacing:.02em}
 .round.on3d{color:var(--blue);background:rgba(74,163,240,.14)}
+.round.on-follow{color:var(--blue);background:rgba(74,163,240,.16)}
+.round.on-follow svg .fill{animation:breathe 2.4s ease-in-out infinite}
 /* 3D is a viewing mode: capture and line tools stay in 2D */
 body.is3d #palette,body.is3d #coach,body.is3d #btnBase,body.is3d #sideBtns .group+.group,body.is3d #lineBanner{display:none!important}
 #map3d .maplibregl-ctrl-bottom-right{bottom:calc(var(--safe-bot) + 12px);right:4px}
