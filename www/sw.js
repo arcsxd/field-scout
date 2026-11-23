@@ -6,6 +6,7 @@ self.addEventListener('activate', e => { e.waitUntil(caches.keys().then(ks => Pr
 self.addEventListener('fetch', e => {
   const u = new URL(e.request.url);
   if (u.origin !== location.origin) return; // map tiles are cached in IndexedDB by the app
+  if (u.pathname.includes('/media/') || e.request.headers.has('range')) return; // video: streamed, not cached
   // Network first, revalidating with the server ('no-cache') so a new version shows up on the next
   // launch instead of a copy the browser kept for 10 minutes; the cache is only the offline fallback.
   const fresh = e.request.mode === 'navigate'

@@ -19,6 +19,14 @@ const I18N = {
     farmName:'Farm / site name', operator:'Operator', declination:'Magnetic declination (°, west = negative)',
     importKml:'Import farm KML/KMZ (spray areas)', clearFarm:'Remove farm boundaries',
     exportKmz:'Export KMZ (with photos)', exportKml:'Export KML', exportCsv:'Export CSV',
+    howTo:'How to use', tourSkip:'Skip', tourBack:'Back', tourNext:'Next', tourDone:'Start', tourVideo:'Watch the video (1 min)',
+    tourStepOf:'{i} of {n}', videoNote:'Demo recording: the background is a drawn map and the GPS is simulated.',
+    tour1T:'Mark obstacles in the field', tour1:'Field Scout records poles, towers, pivots and buildings with your GPS and exports a KMZ for the mapping team.',
+    tour2T:'Tap the type and stand still', tour2:'Pick the type in the bottom bar. Stand next to the obstacle while the app averages the GPS for 10 s, enter the height and tap Save.',
+    tour3T:'Far away or seen on the map', tour3:'Use the On map tab to place it on the satellite image, or Bearing + dist with the compass and a rangefinder.',
+    tour4T:'Power lines', tour4:'Tap the line button, then save the poles in order. Finish joins them into a power line or guy wire.',
+    tour5T:'Import, review and export', tour5:'In the menu: import a KML and review the classification, see everything in 3D, and export the KMZ at the end of the day.',
+    tour6T:'No signal in the field?', tour6:'GPS and marking work offline. With Wi-Fi beforehand, browse the farm on the map so the imagery is saved on the device.',
     listFeatures:'Obstacle list', toggleLayer:'Switch map layer', newSession:'New session (erase all)',
     gpsWait:'GPS…', gpsNone:'No GPS', gpsOff:'Off', gpsDeniedTitle:'Location is blocked',
     gpsDeniedIos:'iPhone: Settings → Privacy & Security → Location Services → Safari Websites → While Using the App. Also check aA → Website Settings → Location → Allow.',
@@ -62,6 +70,14 @@ const I18N = {
     farmName:'Fazenda / local', operator:'Operador', declination:'Declinação magnética (°, oeste = negativo)',
     importKml:'Importar KML/KMZ da fazenda (áreas)', clearFarm:'Remover limites da fazenda',
     exportKmz:'Exportar KMZ (com fotos)', exportKml:'Exportar KML', exportCsv:'Exportar CSV',
+    howTo:'Como usar', tourSkip:'Pular', tourBack:'Voltar', tourNext:'Próximo', tourDone:'Começar', tourVideo:'Ver o vídeo (1 min)',
+    tourStepOf:'{i} de {n}', videoNote:'Gravação de demonstração: o fundo é um mapa desenhado e o GPS é simulado.',
+    tour1T:'Marque obstáculos no campo', tour1:'O Field Scout registra postes, torres, pivôs e edificações com o seu GPS e exporta um KMZ para a equipe de mapeamento.',
+    tour2T:'Toque no tipo e fique parado', tour2:'Escolha o tipo na barra de baixo. Fique ao lado do obstáculo enquanto o app faz a média do GPS por 10 s, informe a altura e toque em Salvar.',
+    tour3T:'De longe ou pela imagem', tour3:'Use a aba No mapa para posicionar pela imagem de satélite, ou Rumo + dist com a bússola e uma trena laser.',
+    tour4T:'Linhas de energia', tour4:'Toque no botão de linha e salve os postes em ordem. Concluir liga todos numa linha de energia ou cabo de estai.',
+    tour5T:'Importar, revisar e exportar', tour5:'No menu: importe um KML e revise a classificação, veja tudo em 3D e exporte o KMZ no fim do dia.',
+    tour6T:'Sem sinal no campo?', tour6:'GPS e marcação funcionam offline. Antes, com Wi-Fi, percorra a fazenda no mapa para a imagem ficar salva no aparelho.',
     listFeatures:'Lista de obstáculos', toggleLayer:'Trocar camada do mapa', newSession:'Nova sessão (apaga tudo)',
     gpsWait:'GPS…', gpsNone:'Sem GPS', gpsOff:'Desligado', gpsDeniedTitle:'Localização bloqueada',
     gpsDeniedIos:'iPhone: Ajustes → Privacidade e Segurança → Serviços de Localização → Sites do Safari → Durante o Uso do App. Confira também aA → Ajustes do Site → Localização → Permitir.',
@@ -872,6 +888,41 @@ function moveTabInd() {
   ind.style.width = a.offsetWidth + 'px'; ind.style.transform = 'translateX(' + a.offsetLeft + 'px)';
 }
 function updateSaveBtn() { $('#btnSave').disabled = !(cap && cap.pos); }
+// ---------------------------------------------------------------- how-to tour + demo video
+// Six short cards shown on first launch and from Menu > How to use; the video plays in its own overlay.
+const TOUR_ICONS = [
+  svg('<path d="M12 21s-6.5-6.2-6.5-11A6.5 6.5 0 0 1 18.5 10c0 4.8-6.5 11-6.5 11z"/><circle cx="12" cy="10" r="2.4"/>'),
+  svg('<path d="M12 3v18M6 6.5h12M7.5 6.5v2M16.5 6.5v2M9 21h6"/>'),
+  svg('<path d="M12 3v5M12 16v5M3 12h5M16 12h5"/><circle cx="12" cy="12" r="1.4" class="fill"/>'),
+  svg('<path d="M4 19 10 9l5 6 5-10"/><circle cx="4" cy="19" r="1.6" class="fill"/><circle cx="10" cy="9" r="1.6" class="fill"/><circle cx="15" cy="15" r="1.6" class="fill"/><circle cx="20" cy="5" r="1.6" class="fill"/>'),
+  svg('<path d="M12 4v11M7 10l5 5 5-5M5 20h14"/>'),
+  svg('<path d="M2 9a15 15 0 0 1 20 0M5 12.5a10 10 0 0 1 14 0M8.5 16a5 5 0 0 1 7 0"/><path d="M3 3l18 18"/>'),
+];
+let tourI = 0;
+function renderTour() {
+  const n = TOUR_ICONS.length, i = tourI;
+  $('#tourIc').innerHTML = TOUR_ICONS[i];
+  $('#tourStep').textContent = t('tourStepOf').replace('{i}', i + 1).replace('{n}', n);
+  $('#tourTitle').textContent = t(`tour${i + 1}T`);
+  $('#tourText').textContent = t(`tour${i + 1}`);
+  $('#btnTourBack').classList.toggle('invisible', i === 0);
+  $('#btnTourNext').textContent = i === n - 1 ? t('tourDone') : t('tourNext');
+  $('#btnTourVideo').classList.toggle('hidden', !(i === 0 || i === n - 1));
+  $('#btnTourLang').textContent = S.lang === 'en' ? 'PT' : 'EN';
+  $('#tourDots').innerHTML = TOUR_ICONS.map((_, k) => `<i class="${k === i ? 'on' : ''}"></i>`).join('');
+  const card = $('#tour .tourBody'); card.classList.remove('swap'); void card.offsetWidth; card.classList.add('swap');
+}
+function openTour(i = 0) { closeAllSheets(); tourI = i; renderTour(); $('#tour').classList.remove('hidden'); }
+function closeTour() {
+  $('#tour').classList.add('hidden');
+  try { localStorage.setItem('fs-tour', 'done'); } catch {}
+}
+function openVideo() {
+  const v = $('#tourVideo'); $('#videoBox').classList.remove('hidden');
+  try { v.currentTime = 0; v.play().catch(() => {}); } catch {}
+}
+function closeVideo() { const v = $('#tourVideo'); try { v.pause(); } catch {} $('#videoBox').classList.add('hidden'); }
+
 function closeAllSheets() { reviewNote = ''; ['#sheet', '#menu', '#list', '#review'].forEach(s => $(s).classList.add('hidden')); if (lineMode) $('#lineBanner').classList.remove('hidden'); stopAvg(); stopCompass(); cancelTapPick(); clearPreview(); }
 
 // GPS averaging (weighted by 1/acc²)
@@ -1328,12 +1379,15 @@ function applyLang() {
   });
   updateLineBanner(); updateStats();
   if (!fix) $('#gpsText').textContent = t(gpsDenied ? 'gpsOff' : 'gpsWait');
+  if (!$('#tour').classList.contains('hidden')) renderTour();
   if (!$('#gpsBanner').classList.contains('hidden')) showGpsHelp();
 }
 // Keyboard (desktop): 1-5 pick a type, Esc closes/cancels, Ctrl/Cmd+Z undoes.
 document.addEventListener('keydown', e => {
   const typing = /^(INPUT|TEXTAREA|SELECT)$/.test(document.activeElement?.tagName);
   if (e.key === 'Escape') {
+    if (!$('#videoBox').classList.contains('hidden')) { closeVideo(); return; }
+    if (!$('#tour').classList.contains('hidden')) { closeTour(); return; }
     if (tapPicking) { cancelTapPick(true); return; }
     if (map._popup && map.hasLayer(map._popup)) { map.closePopup(); return; }
     closeAllSheets(); if (!$('#sheet').classList.contains('hidden')) cap = null; return;
@@ -1383,6 +1437,14 @@ function wire() {
   $('#btnExportKmz').onclick = exportKmz;
   $('#btnExportCsv').onclick = exportCsv;
   $('#btnList').onclick = openList;
+  $('#btnHelp').onclick = () => openTour(0);
+  $('#btnTourSkip').onclick = closeTour;
+  $('#btnTourLang').onclick = () => $('#btnLang').click();
+  $('#btnTourNext').onclick = () => { if (tourI < TOUR_ICONS.length - 1) { tourI++; renderTour(); } else closeTour(); };
+  $('#btnTourBack').onclick = () => { if (tourI > 0) { tourI--; renderTour(); } };
+  $('#btnTourVideo').onclick = openVideo;
+  $('#btnVideoClose').onclick = closeVideo;
+  $('#videoBox').onclick = e => { if (e.target.id === 'videoBox') closeVideo(); };
   $('#btnLayer').onclick = nextBasemap;
   $('#btnBase').onclick = nextBasemap;
   $('#btnNew').onclick = async () => {
@@ -1406,6 +1468,8 @@ function wire() {
   wire(); applyTheme(false); applyLang(); drawFarm(); drawTrack(); refreshAll();
   if (isDesk()) L.control.zoom({ position: 'bottomright' }).addTo(map);
   if (S.features.length) map.fitBounds(L.featureGroup([...markerById.values()]).getBounds(), { padding: [40, 40], maxZoom: 17 });
+  let seenTour = false; try { seenTour = localStorage.getItem('fs-tour') === 'done'; } catch {}
+  if (!seenTour && !S.features.length) setTimeout(() => openTour(0), 600);   // first launch only
   else if (farmPolys) map.fitBounds(L.geoJSON(S.farmGeo).getBounds());
   startGps();
   if ('serviceWorker' in navigator && location.protocol === 'https:') navigator.serviceWorker.register('sw.js').catch(() => {});

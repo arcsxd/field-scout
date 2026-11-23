@@ -381,6 +381,32 @@ body:has(#recChip:not(.hidden)) #recChip{flex:1;justify-content:center}
   .leaflet-bottom.leaflet-right{bottom:0}
 }
 
+/* ---------- how-to tour + video ---------- */
+#tour,#videoBox{position:fixed;inset:0;z-index:5000;display:grid;place-items:center;padding:calc(var(--safe-top) + 16px) 16px calc(var(--safe-bot) + 16px);background:rgba(5,8,10,.55);backdrop-filter:blur(6px);-webkit-backdrop-filter:blur(6px);animation:fadeIn .25s ease-out}
+#videoBox{z-index:5100;background:rgba(5,8,10,.8)}
+.tourCard{position:relative;width:100%;max-width:380px;background:var(--panel);border:1px solid var(--line);border-radius:22px;padding:26px 22px 18px;box-shadow:var(--shadow);display:flex;flex-direction:column;gap:14px;animation:popIn .3s var(--spring)}
+.tourLang{position:absolute;top:12px;left:12px;border:1px solid var(--line);background:var(--panel2);color:var(--text);font-size:12px;font-weight:700;letter-spacing:.06em;padding:5px 9px;border-radius:8px}
+.tourSkip{position:absolute;top:12px;right:12px;border:0;background:none;color:var(--muted);font-size:14px;font-weight:600;padding:6px 8px;border-radius:8px}
+.tourSkip:hover{color:var(--text)}
+.tourBody{display:flex;flex-direction:column;align-items:center;text-align:center;gap:8px;min-height:212px}
+.tourBody.swap{animation:rise .35s var(--ease-out)}
+.tourIc{width:64px;height:64px;border-radius:18px;display:grid;place-items:center;color:var(--accent);background:color-mix(in srgb,var(--accent) 14%,transparent);box-shadow:inset 0 0 0 1px color-mix(in srgb,var(--accent) 35%,transparent);margin-bottom:6px}
+.tourIc svg{width:32px;height:32px;stroke-width:1.8}
+:root[data-scheme="light"] .tourIc{color:color-mix(in srgb,var(--accent) 70%,#1a1a1a)}
+.tourStep{font-size:11px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:var(--muted)}
+.tourBody h2{margin:0;font-size:21px;font-weight:750;letter-spacing:-.02em;text-wrap:balance}
+.tourBody p{margin:0;font-size:15px;line-height:1.5;color:var(--text2);text-wrap:pretty}
+.tourDots{display:flex;justify-content:center;gap:6px}
+.tourDots i{width:6px;height:6px;border-radius:3px;background:var(--line2);transition:width .25s var(--ease-out),background .25s}
+.tourDots i.on{width:18px;background:var(--text)}
+.tourNav{display:flex;justify-content:space-between;gap:10px}
+.tourNav .btn{min-width:112px}
+.invisible{visibility:hidden}
+.videoCard{position:relative;width:100%;max-width:420px;max-height:100%;display:flex;flex-direction:column;gap:10px;align-items:center;animation:popIn .3s var(--ease-out)}
+.videoCard video{width:100%;max-height:calc(100vh - 140px);border-radius:16px;background:#000;box-shadow:var(--shadow)}
+.videoCard p{margin:0;font-size:12.5px;color:#c3cbd2;text-align:center}
+.videoCard .x{position:absolute;top:-6px;right:-6px;z-index:1;background:var(--panel)}
+
 /* ---------- motion ----------
    One language throughout: things rise into place with a soft ease-out, confirmations get a small spring. */
 @keyframes rise{from{opacity:0;transform:translateY(14px)}to{opacity:1;transform:none}}
