@@ -1,1 +1,39 @@
-{"name": "Field Scout", "short_name": "Field Scout", "start_url": "./", "display": "standalone", "background_color": "#0d1013", "theme_color": "#0d1013", "icons": [{"src": "icon-512.png", "sizes": "512x512", "type": "image/png"}, {"src": "icon-1024.png", "sizes": "1024x1024", "type": "image/png", "purpose": "any"}]}
+{
+ "name": "Field Scout",
+ "short_name": "Field Scout",
+ "start_url": "./",
+ "display": "standalone",
+ "background_color": "#0d1013",
+ "theme_color": "#0d1013",
+ "icons": [
+  {
+   "src": "icon-192.png",
+   "sizes": "192x192",
+   "type": "image/png",
+   "purpose": "any"
+  },
+  {
+   "src": "icon-512.png",
+   "sizes": "512x512",
+   "type": "image/png",
+   "purpose": "any"
+  },
+  {
+   "src": "icon-1024.png",
+   "sizes": "1024x1024",
+   "type": "image/png",
+   "purpose": "any"
+  },
+  {
+   "src": "icon-512.png",
+   "sizes": "512x512",
+   "type": "image/png",
+   "purpose": "maskable"
+  }
+ ],
+ "id": "./",
+ "scope": "./",
+ "lang": "pt-BR",
+ "orientation": "any",
+ "description": "Obstacle scouting for the Pyka mapping process: mark poles, towers, pivots and buildings with GPS and export KMZ."
+}
