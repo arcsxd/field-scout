@@ -325,6 +325,35 @@ select{width:auto}
 body:has(#recChip:not(.hidden)) #farmTitle{display:none}
 body:has(#recChip:not(.hidden)) #recChip{flex:1;justify-content:center}
 
+/* ---------- desktop (wide screen + mouse) ----------
+   Sheets dock as a left panel over the map, the type bar floats centred, picking is a click. */
+@keyframes panelIn{from{opacity:0;transform:translateX(-24px)}to{opacity:1;transform:none}}
+@media (min-width:900px) and (pointer:fine){
+  .sheet{left:16px;right:auto;top:64px;bottom:16px;width:420px;max-height:none;border:1px solid var(--line);border-radius:18px;padding:14px 18px 18px;box-shadow:var(--shadow),var(--hair)}
+  .sheet::before{display:none}
+  .sheet:not(.hidden){animation:panelIn .32s var(--ease-out)}
+  .saveBar{bottom:-18px;margin:4px -18px -18px;padding:12px 18px 18px;border-radius:0 0 18px 18px}
+  #palette{left:calc(50% - 280px);right:auto;width:560px;bottom:16px}
+  body:has(.sheet:not(.hidden)) #palette{left:calc(50% - 280px + 218px)}
+  #palette .pbtn{min-height:64px}
+  .pbtn:hover{background:var(--panel2)}
+  .pbtn .cnt{right:calc(50% - 28px)}
+  #coach{bottom:104px}
+  body:has(.sheet:not(.hidden)) #coach{display:none}
+  .banner{left:calc(50% - 250px);right:auto;width:500px}
+  body:has(.sheet:not(.hidden)) .banner{left:calc(50% - 250px + 218px)}
+  #toast{bottom:104px}
+  body.picking .leaflet-container,body.picking .leaflet-grab,body.picking .leaflet-interactive{cursor:crosshair}
+  .btn:hover:not(:disabled){filter:brightness(1.12)}
+  .round:hover,.rowBtn:hover,.li:hover,.x:hover{background:var(--panel3)}
+  .tp:hover{border-color:var(--line2);color:var(--text)}
+  .tab:hover:not(.active){color:var(--text)}
+  .leaflet-control-zoom{border:1px solid var(--line)!important;border-radius:12px!important;overflow:hidden;box-shadow:var(--shadow)!important;margin-bottom:16px!important;margin-right:10px!important}
+  .leaflet-control-zoom a{background:var(--surface)!important;color:var(--text)!important;border-bottom:1px solid var(--line)!important;width:40px!important;height:40px!important;line-height:40px!important;font-size:20px!important}
+  .leaflet-control-zoom a:hover{background:var(--panel3)!important}
+  .leaflet-bottom.leaflet-right{bottom:0}
+}
+
 /* ---------- motion ----------
    One language throughout: things rise into place with a soft ease-out, confirmations get a small spring. */
 @keyframes rise{from{opacity:0;transform:translateY(14px)}to{opacity:1;transform:none}}

@@ -19,6 +19,7 @@ App de scouting de obstáculos para o processo de mapeamento da Pyka (Step 4). I
 
 ## Web version
 Published automatically to GitHub Pages from `www/`. Open on the phone → Share → Add to Home Screen.
+On a computer (wide screen + mouse) the same address opens a desktop layout: side panel, click the map to place an obstacle, keys 1–5 pick a type, Esc closes, Ctrl+Z undoes.
 
 ## iOS app (SideStore)
 Every push to `main` runs `.github/workflows/ios.yml` on a macOS runner and publishes an **unsigned** `FieldScout.ipa`
