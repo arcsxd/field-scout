@@ -10,7 +10,7 @@ const I18N = {
     pivot:'Pivot', tree:'Tree', other:'Other',
     lineKind_power:'Power line', lineKind_guy:'Guy wire',
     finish:'Finish', cancel:'Cancel', save:'Save', menu:'Menu',
-    tapHint:'Move the map so the + is on the obstacle, then tap the map.',
+    tapHint:'Move the map so the + is on the obstacle, then tap the map.', tapHintDesk:'Click the obstacle on the map. Esc cancels.',
     mGps:'My GPS', mMap:'On map', mBearing:'Bearing + dist',
     startAvg:'Average GPS', stopAvg:'Stop', mapPaneHint:'Use when you can see the obstacle on the satellite image.',
     pickOnMap:'Pick on map', bearingHint:'Stand still, point the phone at the obstacle, read the bearing and enter the distance (rangefinder or estimate).',
@@ -53,7 +53,7 @@ const I18N = {
     pivot:'Pivô', tree:'Árvore', other:'Outro',
     lineKind_power:'Linha de energia', lineKind_guy:'Cabo de estai',
     finish:'Concluir', cancel:'Cancelar', save:'Salvar', menu:'Menu',
-    tapHint:'Mova o mapa até o + ficar sobre o obstáculo e toque no mapa.',
+    tapHint:'Mova o mapa até o + ficar sobre o obstáculo e toque no mapa.', tapHintDesk:'Clique no obstáculo no mapa. Esc cancela.',
     mGps:'Meu GPS', mMap:'No mapa', mBearing:'Rumo + dist',
     startAvg:'Média do GPS', stopAvg:'Parar', mapPaneHint:'Use quando o obstáculo aparece na imagem de satélite.',
     pickOnMap:'Marcar no mapa', bearingHint:'Fique parado, aponte o celular para o obstáculo, leia o rumo e informe a distância (trena laser ou estimativa).',
@@ -183,6 +183,11 @@ function toast(msg, ms = 1800) {
 }
 const fmt = (n, d = 1) => (n == null || isNaN(n)) ? '—' : Number(n).toFixed(d);
 
+// ---------------------------------------------------------------- desktop
+// Wide screen with a mouse: side panel instead of bottom sheets, click-to-place instead of GPS.
+const deskMQ = window.matchMedia ? matchMedia('(min-width: 900px) and (pointer: fine)') : { matches: false };
+const isDesk = () => deskMQ.matches;
+
 // ---------------------------------------------------------------- map
 const map = L.map('map', { zoomControl: false, attributionControl: true, maxZoom: 21 }).setView([-12.15, -45.0], 13);
 
@@ -264,7 +269,7 @@ function onPosErr(e) {
   $('#gpsChip .dot').className = 'dot bad';
   const denied = gpsDenied = !!(e && e.code === 1);
   $('#gpsText').textContent = denied ? t('gpsOff') : t('gpsNone');
-  if (denied) showGpsHelp();
+  if (denied && !isDesk()) showGpsHelp();
   else if (!fix) toast(t('gpsUnavail'), 3000);
 }
 // Location was refused (or never asked because the OS blocks it): explain how to allow it.
@@ -777,7 +782,7 @@ function openSheet(type, editing = null) {
   $('#sheet').classList.remove('hidden'); $('#lineBanner').classList.add('hidden'); moveTabInd();
   updateSaveBtn();
   // auto-start averaging for fast pole capture
-  if (!editing) startAvg();
+  if (!editing) { if (isDesk()) { setMethod('map'); startTapPick(); } else startAvg(); }
 }
 const lastHeight = {};
 function setMethod(m) {
@@ -837,18 +842,22 @@ function stopAvg() {
 let tapPicking = false;
 function startTapPick() {
   tapPicking = true;
-  $('#sheet').classList.add('hidden');
-  $('#tapBanner').classList.remove('hidden'); $('#crosshair').classList.remove('hidden');
+  const desk = isDesk();
+  // phone: hide the sheet and aim with the centre crosshair; desktop: the side panel stays, click the spot
+  if (!desk) $('#sheet').classList.add('hidden');
+  $('#tapBanner [data-i18n="tapHint"]').textContent = t(desk ? 'tapHintDesk' : 'tapHint');
+  $('#tapBanner').classList.remove('hidden'); $('#crosshair').classList.toggle('hidden', desk);
+  document.body.classList.add('picking');
 }
 function cancelTapPick(reopen = false) {
   if (!tapPicking) return;
-  tapPicking = false;
+  tapPicking = false; document.body.classList.remove('picking');
   $('#tapBanner').classList.add('hidden'); $('#crosshair').classList.add('hidden');
   if (reopen && cap) $('#sheet').classList.remove('hidden');
 }
-map.on('click', () => {
+map.on('click', e => {
   if (!tapPicking) return;
-  const c = map.getCenter();
+  const c = isDesk() ? e.latlng : map.getCenter();
   cap.pos = { lat: c.lat, lon: c.lng, acc: null }; cap.method = 'map';
   $('#mapPickStatus').textContent = `${c.lat.toFixed(6)}, ${c.lng.toFixed(6)} (z${map.getZoom()})`;
   cancelTapPick(true); updateSaveBtn(); showPreview(true);
@@ -1157,7 +1166,11 @@ function showPreview(forcePan = false) {
   if (near && nd < 8) { dw.className = 'warn orange'; dw.textContent = t('dupNear').replace('{type}', t(near.type)).replace('{d}', nd.toFixed(1)); }
   else dw.classList.add('hidden');
   // keep the point visible above the sheet
-  if ((forcePan || !cap.panned) && !$('#sheet').classList.contains('hidden')) {
+  if (isDesk()) {   // side panel: only pan if the point is hidden under it or off screen
+    const pt = map.latLngToContainerPoint(ll), panelR = $('#sheet').getBoundingClientRect().right + 24;
+    if (pt.x < panelR || pt.x > window.innerWidth - 70 || pt.y < 70 || pt.y > window.innerHeight - 110)
+      map.panBy([pt.x - (panelR + window.innerWidth) / 2, pt.y - window.innerHeight / 2], { animate: true });
+  } else if ((forcePan || !cap.panned) && !$('#sheet').classList.contains('hidden')) {
     cap.panned = true;
     if (map.getZoom() < 17) map.setView(ll, 18, { animate: false });
     const pt = map.latLngToContainerPoint(ll), sheetH = $('#sheet').offsetHeight;
@@ -1229,6 +1242,20 @@ function applyLang() {
   if (!fix) $('#gpsText').textContent = t(gpsDenied ? 'gpsOff' : 'gpsWait');
   if (!$('#gpsBanner').classList.contains('hidden')) showGpsHelp();
 }
+// Keyboard (desktop): 1-5 pick a type, Esc closes/cancels, Ctrl/Cmd+Z undoes.
+document.addEventListener('keydown', e => {
+  const typing = /^(INPUT|TEXTAREA|SELECT)$/.test(document.activeElement?.tagName);
+  if (e.key === 'Escape') {
+    if (tapPicking) { cancelTapPick(true); return; }
+    if (map._popup && map.hasLayer(map._popup)) { map.closePopup(); return; }
+    closeAllSheets(); if (!$('#sheet').classList.contains('hidden')) cap = null; return;
+  }
+  if (typing || e.altKey) return;
+  if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'z') { e.preventDefault(); undo(); return; }
+  if (e.ctrlKey || e.metaKey) return;
+  const n = parseInt(e.key, 10), active = TYPES.filter(ty => !ty.retired);
+  if (n >= 1 && n <= active.length && !is3d) { e.preventDefault(); openSheet(active[n - 1].id); }
+});
 function wire() {
   $('#btnLang').onclick = () => { S.lang = S.lang === 'en' ? 'pt' : 'en'; applyLang(); persist(); };
   $('#btnMenu').onclick = () => { closeAllSheets(); $('#inFarm').value = S.farm; $('#inOperator').value = S.operator; $('#inDecl').value = S.decl; updateStats(); $('#menu').classList.remove('hidden'); };
@@ -1288,6 +1315,7 @@ function wire() {
   recomputeTrackStats();
   if (S.basemap && S.basemap !== 'sat') setBasemap(S.basemap);
   wire(); applyLang(); drawFarm(); drawTrack(); refreshAll();
+  if (isDesk()) L.control.zoom({ position: 'bottomright' }).addTo(map);
   if (S.features.length) map.fitBounds(L.featureGroup([...markerById.values()]).getBounds(), { padding: [40, 40], maxZoom: 17 });
   else if (farmPolys) map.fitBounds(L.geoJSON(S.farmGeo).getBounds());
   startGps();
