@@ -541,12 +541,15 @@ async function openPopup(f, m) {
     ${f.srcName ? `<div class="src"><span>${t('srcLbl')}</span> ${escapeHtml(f.srcName)}${f.review ? ` <em>${t('toClassify')}</em>` : ''}</div>` : ''}
     ${f.notes ? '<p class="notes">' + escapeHtml(f.notes) + '</p>' : ''}${imgs ? '<div class="popImgs">' + imgs + '</div>' : ''}
     <div class="pbtns"><button data-a="edit">${t('edit')}</button><button data-a="move">${t('move')}</button><button data-a="del" class="danger">${t('del')}</button></div></div>`;
-  m.bindPopup(html, { autoPanPaddingTopLeft: [12, 72], autoPanPaddingBottomRight: [68, 110], maxWidth: 300 }).openPopup();
-  const el = m.getPopup().getElement();
+  // A standalone popup: binding one to the marker would add Leaflet's own click toggle, which closed
+  // the popup again on every later tap (it opened once, then never again).
+  const pop = L.popup({ autoPanPaddingTopLeft: [12, 72], autoPanPaddingBottomRight: [68, 110], maxWidth: 300, offset: [0, f.type === 'pole' ? 0 : -6] })
+    .setLatLng(m.getLatLng()).setContent(html).openOn(map);
+  const el = pop.getElement();
   el.querySelector('[data-a=edit]').onclick = () => { map.closePopup(); openSheet(f.type, f); };
   el.querySelector('[data-a=del]').onclick = () => { map.closePopup(); deleteFeature(f.id); };
   el.querySelector('[data-a=move]').onclick = () => {
-    map.closePopup(); m.unbindPopup(); m.dragging.enable(); toast(t('dragHint'), 2500);
+    map.closePopup(); m.dragging.enable(); toast(t('dragHint'), 2500);
     m.off('click'); m.once('click', () => {
       const ll = m.getLatLng(); const old = { lat: f.lat, lon: f.lon };
       f.lat = ll.lat; f.lon = ll.lng; f.method += '+moved';
