@@ -13,6 +13,7 @@ App de scouting de obstáculos para o processo de mapeamento da Pyka (Step 4). I
 - **Scout track** recording (keeps running with the screen off in the iOS app)
 - Import farm KML/KMZ → spray areas + **1.5 km buffer**; each obstacle is tagged `spray_area` / `within_1_5km` / `beyond_1_5km`
 - Export **KMZ** (with photos), **KML**, **CSV** — always in English
+- **Appearance**: Automatic (follows the device), Light or Dark, in the menu
 - **3D view**: satellite on terrain with every obstacle extruded to its height and wires between pole tops
 - Works offline; map tiles you view are cached on the device
 - Edit, move, delete, undo

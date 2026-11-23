@@ -44,7 +44,7 @@ const I18N = {
     importNone:'No points found in this file', importAreasOnly:'This file only has areas. Use Import farm KML/KMZ.', mImport:'Imported',
     reviewEmpty:'Every imported obstacle is classified.', srcLbl:'KML name', toClassify:'To classify', typeLbl:'Type', classified:'Classified',
     hint3d:'Two fingers: drag up/down to tilt, twist to rotate. Tap 2D to go back.', err3d:'3D view is not available on this device', est3d:'estimated height',
-    heightShort:'Height', statObs:'Obstacles', statLines:'Lines', statTrack:'Track', secSession:'Session', secExport:'Export', secFarm:'Farm boundaries', secView:'View',
+    heightShort:'Height', statObs:'Obstacles', statLines:'Lines', statTrack:'Track', secSession:'Session', secExport:'Export', secFarm:'Farm boundaries', secView:'View', secLook:'Appearance', themeAuto:'Automatic', themeLight:'Light', themeDark:'Dark', themeHint:'Automatic follows your device and switches with it.',
     accLbl:'Accuracy', methodLbl:'Method', movedLbl:'moved', listEmpty:'No obstacles yet. Tap a type at the bottom of the map to mark one.',
     coach:'Tap a type to mark an obstacle at your position', lineHint:'Save poles in order', tapTitle:'Pick on map', sheetSub:'New obstacle', sheetSubEdit:'Editing'
   },
@@ -87,7 +87,7 @@ const I18N = {
     importNone:'Nenhum ponto encontrado neste arquivo', importAreasOnly:'Este arquivo só tem áreas. Use Importar KML/KMZ da fazenda.', mImport:'Importado',
     reviewEmpty:'Todos os obstáculos importados estão classificados.', srcLbl:'Nome no KML', toClassify:'A classificar', typeLbl:'Tipo', classified:'Classificado',
     hint3d:'Dois dedos: arraste para cima/baixo para inclinar, gire para rotacionar. Toque em 2D para voltar.', err3d:'A visão 3D não está disponível neste aparelho', est3d:'altura estimada',
-    heightShort:'Altura', statObs:'Obstáculos', statLines:'Linhas', statTrack:'Trilha', secSession:'Sessão', secExport:'Exportar', secFarm:'Limites da fazenda', secView:'Visualizar',
+    heightShort:'Altura', statObs:'Obstáculos', statLines:'Linhas', statTrack:'Trilha', secSession:'Sessão', secExport:'Exportar', secFarm:'Limites da fazenda', secView:'Visualizar', secLook:'Aparência', themeAuto:'Automático', themeLight:'Claro', themeDark:'Escuro', themeHint:'Automático acompanha o aparelho e troca junto com ele.',
     accLbl:'Precisão', methodLbl:'Método', movedLbl:'movido', listEmpty:'Nenhum obstáculo ainda. Toque em um tipo na parte de baixo do mapa para marcar.',
     coach:'Toque em um tipo para marcar um obstáculo na sua posição', lineHint:'Salve os postes em ordem', tapTitle:'Marcar no mapa', sheetSub:'Novo obstáculo', sheetSubEdit:'Editando'
   }
@@ -157,7 +157,7 @@ const DB = (() => {
 
 // ---------------------------------------------------------------- state
 const S = {
-  lang: 'en', basemap: 'sat',
+  lang: 'en', basemap: 'sat', theme: 'auto',
   farm: '', operator: '', decl: 0,
   features: [],   // {id,type,lat,lon,acc,method,height,width,notes,photos:[ids],lineId,ts,op}
   lines: [],      // {id,kind,pointIds:[],ts,op}
@@ -1117,7 +1117,7 @@ function drawScatter(samples, r) {
   const k = (W / 2 - 8) / R;
   // range rings every "nice" step
   const step = R > 20 ? 10 : R > 8 ? 5 : R > 4 ? 2 : 1;
-  g.strokeStyle = '#2a3139'; g.lineWidth = 1.5; g.fillStyle = '#6b7681'; g.font = '600 17px -apple-system, sans-serif';
+  g.strokeStyle = cssVar('--line'); g.lineWidth = 1.5; g.fillStyle = cssVar('--muted'); g.font = '600 17px -apple-system, sans-serif';
   for (let d = step; d <= R; d += step) { g.beginPath(); g.arc(cx, cy, d * k, 0, 2 * Math.PI); g.stroke(); }
   g.fillText(step + ' m', cx + step * k + 3, cy - 3);
   // accuracy circle
@@ -1129,7 +1129,7 @@ function drawScatter(samples, r) {
     g.fillStyle = `rgba(74,163,240,${0.25 + 0.75 * (i + 1) / pts.length})`; g.fill();
   });
   // averaged centre
-  g.strokeStyle = '#e8ecef'; g.lineWidth = 3; g.lineCap = 'round';
+  g.strokeStyle = cssVar('--text'); g.lineWidth = 3; g.lineCap = 'round';
   g.beginPath(); g.moveTo(cx - 12, cy); g.lineTo(cx + 12, cy); g.moveTo(cx, cy - 12); g.lineTo(cx, cy + 12); g.stroke();
 }
 function setRose(sel, deg) { const el = $(sel); if (el) el.style.transform = `rotate(${deg}deg)`; }
@@ -1228,6 +1228,21 @@ function recomputeTrackStats() {
 }
 
 // ---------------------------------------------------------------- UI wiring
+// ---------------------------------------------------------------- appearance (auto / light / dark)
+const cssVar = n => getComputedStyle(document.documentElement).getPropertyValue(n).trim();
+const lightMQ = window.matchMedia ? matchMedia('(prefers-color-scheme: light)') : { matches: false };
+function applyTheme(animate) {
+  const mode = ['auto', 'light', 'dark'].includes(S.theme) ? S.theme : 'auto';
+  const scheme = mode === 'auto' ? (lightMQ.matches ? 'light' : 'dark') : mode;
+  const root = document.documentElement;
+  if (animate) { root.classList.add('themeSwitch'); clearTimeout(applyTheme.t); applyTheme.t = setTimeout(() => root.classList.remove('themeSwitch'), 450); }
+  root.dataset.scheme = scheme;
+  try { localStorage.setItem('fs-theme', mode); } catch {}
+  document.querySelector('meta[name="theme-color"]')?.setAttribute('content', scheme === 'light' ? '#f2f4f6' : '#0d1013');
+  $$('#themeSeg button').forEach(b => { const on = b.dataset.theme === mode; b.classList.toggle('on', on); b.setAttribute('aria-checked', on); });
+}
+lightMQ.addEventListener?.('change', () => { if ((S.theme || 'auto') === 'auto') applyTheme(true); });
+
 function applyLang() {
   document.documentElement.lang = S.lang;
   $('#btnLang').textContent = S.lang === 'en' ? 'PT' : 'EN';
@@ -1259,6 +1274,7 @@ document.addEventListener('keydown', e => {
 });
 function wire() {
   $('#btnLang').onclick = () => { S.lang = S.lang === 'en' ? 'pt' : 'en'; applyLang(); persist(); };
+  $$('#themeSeg button').forEach(b => b.onclick = () => { S.theme = b.dataset.theme; applyTheme(true); persist(); });
   $('#btnMenu').onclick = () => { closeAllSheets(); $('#inFarm').value = S.farm; $('#inOperator').value = S.operator; $('#inDecl').value = S.decl; updateStats(); $('#menu').classList.remove('hidden'); };
   $('#btnMenuClose').onclick = closeAllSheets;
   $('#btnListClose').onclick = closeAllSheets;
@@ -1315,7 +1331,7 @@ function wire() {
   } catch (e) { console.warn(e); }
   recomputeTrackStats();
   if (S.basemap && S.basemap !== 'sat') setBasemap(S.basemap);
-  wire(); applyLang(); drawFarm(); drawTrack(); refreshAll();
+  wire(); applyTheme(false); applyLang(); drawFarm(); drawTrack(); refreshAll();
   if (isDesk()) L.control.zoom({ position: 'bottomright' }).addTo(map);
   if (S.features.length) map.fitBounds(L.featureGroup([...markerById.values()]).getBounds(), { padding: [40, 40], maxZoom: 17 });
   else if (farmPolys) map.fitBounds(L.geoJSON(S.farmGeo).getBounds());
