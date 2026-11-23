@@ -401,10 +401,16 @@ function sat3dTiles() {
   return [ESRI + 'World_Imagery/MapServer/tile/{z}/{y}/{x}'];
 }
 const hOf = f => f.height || DEF_H[f.type] || 5;
+// Real footprints (a pole is ~2 m wide) vanish below a pixel when the whole farm is in view, so every
+// column is drawn at least MIN_PX pixels wide at the current zoom; zooming in shows true sizes again.
+const MIN_PX = 4;
+let minR3d = 0;
+const minRadiusAt = (lat, zoom) => MIN_PX * 40075016.686 * Math.cos(lat * Math.PI / 180) / (512 * Math.pow(2, zoom));
+const minRadius3d = () => map3d ? minRadiusAt(map3d.getCenter().lat, map3d.getZoom()) : minR3d;
 function obstacles3d() {
   const feats = [];
   for (const f of S.features) {
-    const r = f.width ? Math.max(f.width / 2, 0.8) : (FOOT[f.type] || 2);
+    const r = Math.max(f.width ? Math.max(f.width / 2, 0.8) : (FOOT[f.type] || 2), minR3d);
     const c = turf.circle([f.lon, f.lat], r / 1000, { steps: f.type === 'building' ? 4 : 20, units: 'kilometers' });
     c.properties = { id: f.id, type: f.type, h: hOf(f), base: 0, color: (TYPE[f.type] || TYPE.other).color, est: f.height ? 0 : 1 };
     feats.push(c);
@@ -413,7 +419,7 @@ function obstacles3d() {
     const pts = l.pointIds.map(id => S.features.find(f => f.id === id)).filter(Boolean);
     for (let i = 1; i < pts.length; i++) {
       const a = pts[i - 1], b = pts[i], top = Math.min(hOf(a), hOf(b));
-      const slab = turf.buffer(turf.lineString([[a.lon, a.lat], [b.lon, b.lat]]), 0.0007, { units: 'kilometers', steps: 2 });
+      const slab = turf.buffer(turf.lineString([[a.lon, a.lat], [b.lon, b.lat]]), Math.max(0.7, minR3d / 3) / 1000, { units: 'kilometers', steps: 2 });
       if (!slab) continue;
       slab.properties = { h: top, base: top - 0.9, color: LINE_COLORS[l.kind] || '#f5c400', wire: 1 };
       feats.push(slab);
@@ -424,6 +430,7 @@ function obstacles3d() {
 const meGeo = () => turf.featureCollection(fix ? [turf.point([fix.lon, fix.lat])] : []);
 const empty = () => turf.featureCollection([]);
 function init3d(c, z) {
+  minR3d = minRadiusAt(c.lat, z);
   map3d = new maplibregl.Map({
     container: 'map3d', attributionControl: { compact: true }, maxPitch: 80, center: [c.lng, c.lat], zoom: z,
     style: {
@@ -442,6 +449,7 @@ function init3d(c, z) {
         { id: 'farm-fill', type: 'fill', source: 'farm', filter: ['in', ['geometry-type'], ['literal', ['Polygon', 'MultiPolygon']]], paint: { 'fill-color': '#34c77b', 'fill-opacity': 0.1 } },
         { id: 'farm-line', type: 'line', source: 'farm', paint: { 'line-color': '#34c77b', 'line-width': 2 } },
         { id: 'buf-line', type: 'line', source: 'buf', paint: { 'line-color': '#f0a020', 'line-width': 1.5, 'line-dasharray': [1, 3] } },
+        { id: 'farm-pts', type: 'circle', source: 'farm', filter: ['==', ['geometry-type'], 'Point'], paint: { 'circle-radius': 5, 'circle-color': '#34c77b', 'circle-stroke-color': '#0d1013', 'circle-stroke-width': 2, 'circle-pitch-alignment': 'map' } },
         { id: 'obs', type: 'fill-extrusion', source: 'obs', paint: { 'fill-extrusion-color': ['get', 'color'], 'fill-extrusion-height': ['get', 'h'], 'fill-extrusion-base': ['get', 'base'], 'fill-extrusion-opacity': 0.92 } },
         { id: 'me', type: 'circle', source: 'me', paint: { 'circle-radius': 7, 'circle-color': '#4aa3f0', 'circle-stroke-color': '#ffffff', 'circle-stroke-width': 3, 'circle-pitch-alignment': 'map' } },
       ],
@@ -449,6 +457,10 @@ function init3d(c, z) {
     },
   });
   map3d.addControl(new maplibregl.NavigationControl({ visualizePitch: true }), 'bottom-right');
+  map3d.on('zoomend', () => {   // re-size footprints when the zoom changed enough to matter
+    const r = minRadius3d();
+    if (Math.abs(r - minR3d) > minR3d * 0.25 || (r < 1) !== (minR3d < 1)) { minR3d = r; map3d.getSource('obs')?.setData(obstacles3d()); }
+  });
   map3d.on('click', 'obs', e => {
     const p = e.features[0]?.properties; if (!p || p.wire) return;
     new maplibregl.Popup({ closeButton: false, offset: 8 }).setLngLat(e.lngLat)
@@ -459,6 +471,7 @@ function init3d(c, z) {
 }
 function update3d() {
   if (!map3d || !is3d || !map3d.getSource('obs')) return;
+  minR3d = minRadius3d();
   map3d.getSource('obs').setData(obstacles3d());
   map3d.getSource('farm').setData(S.farmGeo || empty());
   map3d.getSource('buf').setData(farmBuffer || empty());
