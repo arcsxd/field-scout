@@ -327,7 +327,7 @@ let activeLineDraft = L.polyline([], { color: '#ffd400', weight: 4, dashArray: '
 let fix = null;          // latest {lat,lon,acc,ts,heading}
 let firstFix = true;
 const fixListeners = new Set();
-const meMarker = L.marker([0, 0], { icon: L.divIcon({ className: '', html: '<div class="me-marker"></div>', iconSize: [18, 18] }), interactive: false });
+const meMarker = L.marker([0, 0], { icon: L.divIcon({ className: 'me-wrap', html: '<div class="me-head"></div><div class="me-marker"></div>', iconSize: [18, 18] }), interactive: false, zIndexOffset: 1000 });
 const meAcc = L.circle([0, 0], { radius: 1, color: '#4aa3f0', weight: 1, opacity: .6, fillOpacity: .1, interactive: false });
 
 let following = false;
@@ -337,21 +337,72 @@ function setFollow(on) {
 }
 map.on('dragstart', () => setFollow(false));     // only fires for a user drag, not for our own panTo
 
+// ---------------------------------------------------------------- smooth position
+// The phone gives about one fix per second. Instead of jumping, the blue dot (and the map, when
+// following) glides from where it is to the new fix over the time between fixes, like a car GPS.
+// A heading cone shows the direction of travel when moving.
+let mePos = null, meHeading = null, glideRaf = 0, zooming = false;
+const glide = { from: null, to: null, t0: 0, dur: 1000, lastAt: 0 };
+const reduceMotion = window.matchMedia ? matchMedia('(prefers-reduced-motion: reduce)').matches : false;
+map.on('zoomstart', () => { zooming = true; });
+map.on('zoomend', () => { zooming = false; });
+function placeMe(lat, lon) {
+  mePos = [lat, lon];
+  meMarker.setLatLng(mePos); meAcc.setLatLng(mePos);
+  updateMe3d();
+  if (following && !cap && !tapPicking) {
+    if (is3d && map3d) map3d.jumpTo({ center: [lon, lat] });
+    else if (!zooming) map.setView(mePos, map.getZoom(), { animate: false });
+  }
+}
+function glideStep(now) {
+  const k = Math.min(1, (now - glide.t0) / glide.dur);
+  placeMe(glide.from[0] + (glide.to[0] - glide.from[0]) * k, glide.from[1] + (glide.to[1] - glide.from[1]) * k);
+  glideRaf = k < 1 ? requestAnimationFrame(glideStep) : 0;
+}
+function glideTo(lat, lon) {
+  const now = performance.now();
+  const interval = glide.lastAt ? now - glide.lastAt : 1000;
+  glide.lastAt = now;
+  const jump = mePos ? turf.distance([mePos[1], mePos[0]], [lon, lat], { units: 'meters' }) : Infinity;
+  // first fix, a big jump (>150 m), background resume, or reduced motion: go straight there
+  if (!mePos || jump > 150 || interval > 5000 || reduceMotion || document.hidden) {
+    if (glideRaf) { cancelAnimationFrame(glideRaf); glideRaf = 0; }
+    return placeMe(lat, lon);
+  }
+  glide.from = mePos.slice(); glide.to = [lat, lon]; glide.t0 = now;
+  glide.dur = Math.min(Math.max(interval, 250), 1500);   // arrive about when the next fix is due
+  if (!glideRaf) glideRaf = requestAnimationFrame(glideStep);
+}
+let lastHeadFix = null;
+function updateHeading(p) {
+  const c = p.coords, speed = c.speed;
+  let h = (typeof c.heading === 'number' && !isNaN(c.heading) && speed > 0.8) ? c.heading : null;
+  if (h == null && lastHeadFix) {                            // no compass course: use the direction of travel
+    const d = turf.distance([lastHeadFix.lon, lastHeadFix.lat], [fix.lon, fix.lat], { units: 'meters' });
+    if (d > Math.max(3, fix.acc * 0.5)) h = turf.bearing([lastHeadFix.lon, lastHeadFix.lat], [fix.lon, fix.lat]);
+    else if (d < 1.5) h = meHeading;                         // standing still: keep the last one briefly
+  }
+  if (h == null || (speed != null && speed < 0.5 && lastHeadFix && Date.now() - lastHeadFix.ts > 8000)) meHeading = null;
+  else meHeading = (h + 360) % 360;
+  if (!lastHeadFix || turf.distance([lastHeadFix.lon, lastHeadFix.lat], [fix.lon, fix.lat], { units: 'meters' }) > 3) lastHeadFix = { ...fix };
+  const el = meMarker.getElement()?.querySelector('.me-head');
+  if (el) { el.style.opacity = meHeading == null ? 0 : 1; if (meHeading != null) el.style.transform = `rotate(${meHeading}deg)`; }
+}
+
 function onPos(p) {
   fix = { lat: p.coords.latitude, lon: p.coords.longitude, acc: p.coords.accuracy, ts: p.timestamp || Date.now() };
   gpsDenied = false; $('#gpsBanner').classList.add('hidden');
-  meMarker.setLatLng([fix.lat, fix.lon]); meAcc.setLatLng([fix.lat, fix.lon]).setRadius(fix.acc);
+  meAcc.setRadius(fix.acc);
   if (!gMe.hasLayer(meMarker)) { gMe.addLayer(meAcc); gMe.addLayer(meMarker); }
+  glideTo(fix.lat, fix.lon);
+  updateHeading(p);
   if (firstFix) { firstFix = false; map.setView([fix.lat, fix.lon], 17); }
   const dot = $('#gpsChip .dot');
   dot.className = 'dot ' + (fix.acc <= 5 ? 'good' : fix.acc <= 15 ? 'mid' : 'bad');
   $('#gpsText').textContent = `±${fmt(fix.acc, 0)} m`;
   fixListeners.forEach(f => f(fix));
-  updateBand(); updateRec(); updateMe3d();
-  if (following && !cap && !tapPicking) {
-    if (is3d && map3d) map3d.easeTo({ center: [fix.lon, fix.lat], duration: 600 });
-    else map.panTo([fix.lat, fix.lon], { animate: true, duration: 0.6, easeLinearity: 0.5 });
-  }
+  updateBand(); updateRec();
   if (tracking && !nativeBg) addTrackPoint(fix);
 }
 let gpsWatch = null, gpsDenied = false;
@@ -549,7 +600,7 @@ function obstacles3d() {
   }
   return turf.featureCollection(feats);
 }
-const meGeo = () => turf.featureCollection(fix ? [turf.point([fix.lon, fix.lat])] : []);
+const meGeo = () => turf.featureCollection(mePos ? [turf.point([mePos[1], mePos[0]])] : fix ? [turf.point([fix.lon, fix.lat])] : []);
 const empty = () => turf.featureCollection([]);
 function init3d(c, z) {
   minR3d = minRadiusAt(c.lat, z);
@@ -1526,4 +1577,4 @@ function wire() {
 })();
 
 // expose for tests
-window.__scout = { S, buildKml, computeAvg, zoneOf, map, map3d: () => map3d, addTrackPoint, trackStats };
+window.__scout = { S, buildKml, computeAvg, zoneOf, map, map3d: () => map3d, addTrackPoint, trackStats, me: () => mePos, heading: () => meHeading };
