@@ -33,6 +33,9 @@ const I18N = {
     gpsDeniedOther:'Allow location for this site in the browser settings, then tap Try again.', gpsUnavail:'No GPS signal yet. Move to open sky.', retry:'Try again', samples:'samples', spread:'spread',
     saved:'Saved', deleted:'Deleted', undone:'Undone', nothingUndo:'Nothing to undo',
     trackOn:'Track recording ON', trackOff:'Track recording OFF',
+    trackOnBg:'Recording: keeps going with the screen off', trackOnWeb:'Recording: the screen stays on (a website cannot use GPS with the screen off)',
+    trackPaused:'The screen was off for {m} min and the track was not recorded. For screen-off recording use the Field Scout app (SideStore).',
+    followOn:'Following your position. Drag the map to stop.',
     lineStart:'Line mode: every pole you save is added to this line',
     lineChooseKind:'Line type? OK = Power line, Cancel = Guy wire',
     lineSaved:'Line saved', lineNeed2:'A line needs at least 2 points',
@@ -84,6 +87,9 @@ const I18N = {
     gpsDeniedOther:'Permita a localização para este site nos ajustes do navegador e toque em Tentar de novo.', gpsUnavail:'Ainda sem sinal de GPS. Vá para céu aberto.', retry:'Tentar de novo', samples:'amostras', spread:'dispersão',
     saved:'Salvo', deleted:'Apagado', undone:'Desfeito', nothingUndo:'Nada para desfazer',
     trackOn:'Gravando trilha', trackOff:'Trilha parada',
+    trackOnBg:'Gravando: continua com a tela apagada', trackOnWeb:'Gravando: a tela fica acesa (site não usa o GPS com a tela apagada)',
+    trackPaused:'A tela ficou apagada por {m} min e a trilha não foi gravada. Para gravar com a tela apagada use o app Field Scout (SideStore).',
+    followOn:'Seguindo sua posição. Arraste o mapa para parar.',
     lineStart:'Modo linha: cada ponto salvo entra nesta linha',
     lineChooseKind:'Tipo de linha? OK = Linha de energia, Cancelar = Cabo de estai',
     lineSaved:'Linha salva', lineNeed2:'Uma linha precisa de pelo menos 2 pontos',
@@ -324,6 +330,13 @@ const fixListeners = new Set();
 const meMarker = L.marker([0, 0], { icon: L.divIcon({ className: '', html: '<div class="me-marker"></div>', iconSize: [18, 18] }), interactive: false });
 const meAcc = L.circle([0, 0], { radius: 1, color: '#4aa3f0', weight: 1, opacity: .6, fillOpacity: .1, interactive: false });
 
+let following = false;
+function setFollow(on) {
+  following = on;
+  $('#btnLocate').classList.toggle('on-follow', on);
+}
+map.on('dragstart', () => setFollow(false));     // only fires for a user drag, not for our own panTo
+
 function onPos(p) {
   fix = { lat: p.coords.latitude, lon: p.coords.longitude, acc: p.coords.accuracy, ts: p.timestamp || Date.now() };
   gpsDenied = false; $('#gpsBanner').classList.add('hidden');
@@ -335,6 +348,10 @@ function onPos(p) {
   $('#gpsText').textContent = `±${fmt(fix.acc, 0)} m`;
   fixListeners.forEach(f => f(fix));
   updateBand(); updateRec(); updateMe3d();
+  if (following && !cap && !tapPicking) {
+    if (is3d && map3d) map3d.easeTo({ center: [fix.lon, fix.lat], duration: 600 });
+    else map.panTo([fix.lat, fix.lon], { animate: true, duration: 0.6, easeLinearity: 0.5 });
+  }
   if (tracking && !nativeBg) addTrackPoint(fix);
 }
 let gpsWatch = null, gpsDenied = false;
@@ -369,16 +386,41 @@ function startGps() {
 let tracking = false, nativeBg = null, bgWatcherId = null;
 const Cap = window.Capacitor;
 const isNative = !!(Cap && Cap.isNativePlatform && Cap.isNativePlatform());
+const TRACK_MAX_ACC = 50;          // m; background fixes on the road are often 30–50 m
+const GAP_S = 30, GAP_M = 60;      // longer silence + jump = recording was interrupted
 function addTrackPoint(f) {
   const last = S.track[S.track.length - 1];
+  if (f.acc > TRACK_MAX_ACC) return;
+  const d = last ? turf.distance([last[1], last[0]], [f.lon, f.lat], { units: 'meters' }) : 0;
   if (last && (f.ts - last[2] < 2000)) return;
-  if (last && turf.distance([last[1], last[0]], [f.lon, f.lat], { units: 'meters' }) < 4) return;
-  if (f.acc > 30) return;
-  if (last) trackStats.m += turf.distance([last[1], last[0]], [f.lon, f.lat], { units: 'meters' });
+  if (last && d < 4) return;
+  // No points for a while and we moved: the recording was interrupted (screen off on the website).
+  // Start a new segment instead of drawing a straight line across roads we never recorded.
+  if (last && (f.ts - last[2]) / 1000 > GAP_S && d > GAP_M) {
+    S.track.push(null);
+    trackLine = L.polyline([], { color: '#4aa3f0', weight: 3, opacity: .85, dashArray: '6 6' }).addTo(gTrack);
+  } else if (last) trackStats.m += d;
   S.track.push([+f.lat.toFixed(7), +f.lon.toFixed(7), f.ts, Math.round(f.acc)]);
   trackLine.addLatLng([f.lat, f.lon]);
   persist();
 }
+// Website: the browser stops the page (and GPS) when the screen goes off, so keep it on while recording.
+let wakeLock = null, hiddenAt = 0;
+async function keepAwake(on) {
+  try {
+    if (on && 'wakeLock' in navigator && !wakeLock) {
+      wakeLock = await navigator.wakeLock.request('screen');
+      wakeLock.addEventListener('release', () => { wakeLock = null; });
+    } else if (!on && wakeLock) { await wakeLock.release(); wakeLock = null; }
+  } catch (e) { console.warn('wake lock', e); }
+}
+document.addEventListener('visibilitychange', () => {
+  if (document.visibilityState === 'hidden') { hiddenAt = Date.now(); return; }
+  if (!tracking || nativeBg) return;
+  keepAwake(true);                                    // the lock is dropped whenever the page is hidden
+  const mins = (Date.now() - hiddenAt) / 60000;
+  if (hiddenAt && mins > 0.3) toast(t('trackPaused').replace('{m}', Math.max(1, Math.round(mins))), 6000);
+});
 async function setTracking(on) {
   tracking = on;
   $('#btnTrack').classList.toggle('on', on);
@@ -396,7 +438,8 @@ async function setTracking(on) {
       });
     } else if (bgWatcherId) { await nativeBg.removeWatcher({ id: bgWatcherId }); bgWatcherId = null; }
   } else nativeBg = null;
-  toast(t(on ? 'trackOn' : 'trackOff'));
+  if (!nativeBg) keepAwake(on);
+  toast(t(!on ? 'trackOff' : nativeBg ? 'trackOnBg' : 'trackOnWeb'), on ? 4000 : 1800);
   persist();
 }
 function drawTrack() {
@@ -546,6 +589,7 @@ function init3d(c, z) {
     new maplibregl.Popup({ closeButton: false, offset: 8 }).setLngLat(e.lngLat)
       .setHTML(`<b>${t(p.type)}</b><br>${fmt(p.h)} m${p.est ? ' · ' + t('est3d') : ''}`).addTo(map3d);
   });
+  map3d.on('dragstart', () => setFollow(false));
   map3d.on('mouseenter', 'obs', () => { map3d.getCanvas().style.cursor = 'pointer'; });
   map3d.on('mouseleave', 'obs', () => { map3d.getCanvas().style.cursor = ''; });
 }
@@ -1411,7 +1455,13 @@ function wire() {
   $('#gpsChip').onclick = () => fix ? map.setView([fix.lat, fix.lon], Math.max(map.getZoom(), 17)) : restartGps();
   $('#btnGpsRetry').onclick = restartGps;
   $('#btnGpsClose').onclick = () => $('#gpsBanner').classList.add('hidden');
-  $('#btnLocate').onclick = () => !fix ? toast(t('noFix')) : is3d ? map3d.easeTo({ center: [fix.lon, fix.lat], zoom: Math.max(map3d.getZoom(), 16) }) : map.setView([fix.lat, fix.lon], Math.max(map.getZoom(), 17));
+  $('#btnLocate').onclick = () => {
+    if (!fix) return toast(t('noFix'));
+    if (!following) toast(t('followOn'), 2500);
+    setFollow(true);
+    if (is3d) map3d.easeTo({ center: [fix.lon, fix.lat], zoom: Math.max(map3d.getZoom(), 16) });
+    else map.setView([fix.lat, fix.lon], Math.max(map.getZoom(), 17));
+  };
   $('#btn3d').onclick = toggle3d;
   $('#btnTrack').onclick = () => setTracking(!tracking);
   $('#btnLine').onclick = startLine;
@@ -1476,4 +1526,4 @@ function wire() {
 })();
 
 // expose for tests
-window.__scout = { S, buildKml, computeAvg, zoneOf, map, map3d: () => map3d };
+window.__scout = { S, buildKml, computeAvg, zoneOf, map, map3d: () => map3d, addTrackPoint, trackStats };
