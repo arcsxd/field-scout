@@ -27,7 +27,23 @@ button{font:inherit;color:inherit;cursor:pointer}
 button:focus-visible,input:focus-visible,select:focus-visible,textarea:focus-visible,.photoAdd:focus-within,.rowBtn:focus-within{outline:2px solid var(--blue);outline-offset:2px}
 svg[aria-hidden]{width:22px;height:22px;fill:none;stroke:currentColor;stroke-width:1.75;stroke-linecap:round;stroke-linejoin:round;display:block;flex:none}
 svg[aria-hidden] .fill{fill:currentColor;stroke:none}
-#map{position:absolute;inset:0;background:#15191c}
+#map{position:absolute;inset:0;z-index:0;background:#15191c}
+#map3d{position:absolute;inset:0;z-index:1;background:#15191c}
+.round.txt{font-size:13.5px;font-weight:800;letter-spacing:.02em}
+.round.on3d{color:var(--blue);background:rgba(74,163,240,.14)}
+/* 3D is a viewing mode: capture and line tools stay in 2D */
+body.is3d #palette,body.is3d #coach,body.is3d #btnBase,body.is3d #sideBtns .group+.group,body.is3d #lineBanner{display:none!important}
+#map3d .maplibregl-ctrl-bottom-right{bottom:calc(var(--safe-bot) + 12px);right:4px}
+#map3d .maplibregl-ctrl-group{background:var(--surface);border:1px solid var(--line);border-radius:12px;box-shadow:var(--shadow);overflow:hidden}
+#map3d .maplibregl-ctrl-group button{width:40px;height:40px}
+#map3d .maplibregl-ctrl-group button+button{border-top:1px solid var(--line)}
+#map3d .maplibregl-ctrl-icon{filter:invert(1) brightness(1.6)}
+#map3d .maplibregl-ctrl-attrib{background:rgba(13,16,19,.6);color:var(--dim);font-size:9px}
+#map3d .maplibregl-ctrl-attrib a{color:var(--muted)}
+#map3d .maplibregl-ctrl-attrib-button{filter:invert(1)}
+#map3d .maplibregl-popup-content{background:var(--panel);color:var(--text);border:1px solid var(--line);border-radius:10px;padding:9px 12px;font:13.5px/1.4 var(--font);box-shadow:var(--shadow)}
+#map3d .maplibregl-popup-tip{display:none}
+#map3d:not(.hidden){animation:fadeIn .35s ease-out}
 .hidden{display:none!important}
 .mono{font-family:var(--mono);font-size:12.5px;font-variant-numeric:tabular-nums;letter-spacing:-.01em}
 .muted{color:var(--muted)} .small{font-size:12px}

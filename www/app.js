@@ -43,6 +43,7 @@ const I18N = {
     importDone:'{n} obstacles imported · {u} to classify', importLines:'{l} lines rebuilt', importLine1:'1 line rebuilt', importDup:'{d} already on the map were skipped', importDup1:'1 was already on the map and was skipped',
     importNone:'No points found in this file', importAreasOnly:'This file only has areas. Use Import farm KML/KMZ.', mImport:'Imported',
     reviewEmpty:'Every imported obstacle is classified.', srcLbl:'KML name', toClassify:'To classify', typeLbl:'Type', classified:'Classified',
+    hint3d:'Two fingers: drag up/down to tilt, twist to rotate. Tap 2D to go back.', err3d:'3D view is not available on this device', est3d:'estimated height',
     heightShort:'Height', statObs:'Obstacles', statLines:'Lines', statTrack:'Track', secSession:'Session', secExport:'Export', secFarm:'Farm boundaries', secView:'View',
     accLbl:'Accuracy', methodLbl:'Method', movedLbl:'moved', listEmpty:'No obstacles yet. Tap a type at the bottom of the map to mark one.',
     coach:'Tap a type to mark an obstacle at your position', lineHint:'Save poles in order', tapTitle:'Pick on map', sheetSub:'New obstacle', sheetSubEdit:'Editing'
@@ -85,6 +86,7 @@ const I18N = {
     importDone:'{n} obstáculos importados · {u} a classificar', importLines:'{l} linhas reconstruídas', importLine1:'1 linha reconstruída', importDup:'{d} já estavam no mapa e foram ignorados', importDup1:'1 já estava no mapa e foi ignorado',
     importNone:'Nenhum ponto encontrado neste arquivo', importAreasOnly:'Este arquivo só tem áreas. Use Importar KML/KMZ da fazenda.', mImport:'Importado',
     reviewEmpty:'Todos os obstáculos importados estão classificados.', srcLbl:'Nome no KML', toClassify:'A classificar', typeLbl:'Tipo', classified:'Classificado',
+    hint3d:'Dois dedos: arraste para cima/baixo para inclinar, gire para rotacionar. Toque em 2D para voltar.', err3d:'A visão 3D não está disponível neste aparelho', est3d:'altura estimada',
     heightShort:'Altura', statObs:'Obstáculos', statLines:'Linhas', statTrack:'Trilha', secSession:'Sessão', secExport:'Exportar', secFarm:'Limites da fazenda', secView:'Visualizar',
     accLbl:'Precisão', methodLbl:'Método', movedLbl:'movido', listEmpty:'Nenhum obstáculo ainda. Toque em um tipo na parte de baixo do mapa para marcar.',
     coach:'Toque em um tipo para marcar um obstáculo na sua posição', lineHint:'Salve os postes em ordem', tapTitle:'Marcar no mapa', sheetSub:'Novo obstáculo', sheetSubEdit:'Editando'
@@ -253,7 +255,7 @@ function onPos(p) {
   dot.className = 'dot ' + (fix.acc <= 5 ? 'good' : fix.acc <= 15 ? 'mid' : 'bad');
   $('#gpsText').textContent = `±${fmt(fix.acc, 0)} m`;
   fixListeners.forEach(f => f(fix));
-  updateBand(); updateRec();
+  updateBand(); updateRec(); updateMe3d();
   if (tracking && !nativeBg) addTrackPoint(fix);
 }
 let gpsWatch = null, gpsDenied = false;
@@ -330,7 +332,7 @@ function drawTrack() {
 let farmPolys = null, farmBuffer = null;
 function drawFarm() {
   gFarm.clearLayers(); farmPolys = null; farmBuffer = null;
-  if (!S.farmGeo) return;
+  if (!S.farmGeo) return update3d();
   const polys = S.farmGeo.features.filter(f => f.geometry && /Polygon/.test(f.geometry.type));
   L.geoJSON(S.farmGeo, {
     style: { color: '#34c77b', weight: 2, opacity: .9, fillColor: '#34c77b', fillOpacity: .07 },
@@ -344,6 +346,7 @@ function drawFarm() {
       L.geoJSON(farmBuffer, { style: { color: '#f0a020', weight: 1.5, opacity: .8, dashArray: '2 7', lineCap: 'round', fill: false }, interactive: false }).addTo(gFarm);
     } catch (e) { console.warn('buffer failed', e); }
   }
+  update3d();
 }
 function zoneOf(lat, lon) {
   if (!farmPolys) return '';
@@ -373,6 +376,114 @@ async function importFarm(file) {
     map.fitBounds(L.geoJSON(gj).getBounds(), { padding: [30, 30] });
     toast(t('farmLoaded'));
   } catch (e) { console.error(e); toast(t('farmErr')); }
+}
+
+// ---------------------------------------------------------------- 3D view (MapLibre GL, loaded on first use)
+// A read-only companion to the 2D map: satellite draped on terrain, every obstacle extruded to its
+// height, wires as thin slabs between pole tops. Editing stays in 2D.
+const DEF_H = { pole: 10, tower: 30, pivot: 4, building: 6, other: 5, guy: 3, silo: 15, tree: 8 };   // m, when no height was entered
+const FOOT = { pole: 1.2, tower: 3, pivot: 2.5, building: 5, other: 2, guy: 0.8, silo: 4, tree: 3 }; // footprint radius, m
+let map3d = null, is3d = false, libP = null;
+function loadMapLibre() {
+  if (window.maplibregl) return Promise.resolve();
+  if (!libP) {
+    libP = new Promise((res, rej) => {
+      const css = document.createElement('link'); css.rel = 'stylesheet'; css.href = 'vendor/maplibre-gl.css'; document.head.appendChild(css);
+      const s = document.createElement('script'); s.src = 'vendor/maplibre-gl.js'; s.onload = res; s.onerror = rej; document.head.appendChild(s);
+    });
+    libP.catch(() => { libP = null; });
+  }
+  return libP;
+}
+function sat3dTiles() {
+  if (S.basemap === 'clarity') return ['https://clarity.maptiles.arcgis.com/arcgis/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}'];
+  if (S.basemap === 'osm') return ['https://tile.openstreetmap.org/{z}/{x}/{y}.png'];
+  return [ESRI + 'World_Imagery/MapServer/tile/{z}/{y}/{x}'];
+}
+const hOf = f => f.height || DEF_H[f.type] || 5;
+function obstacles3d() {
+  const feats = [];
+  for (const f of S.features) {
+    const r = f.width ? Math.max(f.width / 2, 0.8) : (FOOT[f.type] || 2);
+    const c = turf.circle([f.lon, f.lat], r / 1000, { steps: f.type === 'building' ? 4 : 20, units: 'kilometers' });
+    c.properties = { id: f.id, type: f.type, h: hOf(f), base: 0, color: (TYPE[f.type] || TYPE.other).color, est: f.height ? 0 : 1 };
+    feats.push(c);
+  }
+  for (const l of [...S.lines, ...(lineMode && lineMode.pointIds.length > 1 ? [lineMode] : [])]) {
+    const pts = l.pointIds.map(id => S.features.find(f => f.id === id)).filter(Boolean);
+    for (let i = 1; i < pts.length; i++) {
+      const a = pts[i - 1], b = pts[i], top = Math.min(hOf(a), hOf(b));
+      const slab = turf.buffer(turf.lineString([[a.lon, a.lat], [b.lon, b.lat]]), 0.0007, { units: 'kilometers', steps: 2 });
+      if (!slab) continue;
+      slab.properties = { h: top, base: top - 0.9, color: LINE_COLORS[l.kind] || '#f5c400', wire: 1 };
+      feats.push(slab);
+    }
+  }
+  return turf.featureCollection(feats);
+}
+const meGeo = () => turf.featureCollection(fix ? [turf.point([fix.lon, fix.lat])] : []);
+const empty = () => turf.featureCollection([]);
+function init3d(c, z) {
+  map3d = new maplibregl.Map({
+    container: 'map3d', attributionControl: { compact: true }, maxPitch: 80, center: [c.lng, c.lat], zoom: z,
+    style: {
+      version: 8,
+      sources: {
+        sat: { type: 'raster', tiles: sat3dTiles(), tileSize: 256, maxzoom: 19, attribution: 'Imagery © Esri, Maxar, Earthstar' },
+        dem: { type: 'raster-dem', tiles: ['https://s3.amazonaws.com/elevation-tiles-prod/terrarium/{z}/{x}/{y}.png'], tileSize: 256, maxzoom: 15, encoding: 'terrarium', attribution: 'Terrain: Mapzen, AWS' },
+        obs: { type: 'geojson', data: obstacles3d() },
+        farm: { type: 'geojson', data: S.farmGeo || empty() },
+        buf: { type: 'geojson', data: farmBuffer || empty() },
+        me: { type: 'geojson', data: meGeo() },
+      },
+      layers: [
+        { id: 'bg', type: 'background', paint: { 'background-color': '#15191c' } },
+        { id: 'sat', type: 'raster', source: 'sat' },
+        { id: 'farm-fill', type: 'fill', source: 'farm', filter: ['in', ['geometry-type'], ['literal', ['Polygon', 'MultiPolygon']]], paint: { 'fill-color': '#34c77b', 'fill-opacity': 0.1 } },
+        { id: 'farm-line', type: 'line', source: 'farm', paint: { 'line-color': '#34c77b', 'line-width': 2 } },
+        { id: 'buf-line', type: 'line', source: 'buf', paint: { 'line-color': '#f0a020', 'line-width': 1.5, 'line-dasharray': [1, 3] } },
+        { id: 'obs', type: 'fill-extrusion', source: 'obs', paint: { 'fill-extrusion-color': ['get', 'color'], 'fill-extrusion-height': ['get', 'h'], 'fill-extrusion-base': ['get', 'base'], 'fill-extrusion-opacity': 0.92 } },
+        { id: 'me', type: 'circle', source: 'me', paint: { 'circle-radius': 7, 'circle-color': '#4aa3f0', 'circle-stroke-color': '#ffffff', 'circle-stroke-width': 3, 'circle-pitch-alignment': 'map' } },
+      ],
+      terrain: { source: 'dem', exaggeration: 1 },
+    },
+  });
+  map3d.addControl(new maplibregl.NavigationControl({ visualizePitch: true }), 'bottom-right');
+  map3d.on('click', 'obs', e => {
+    const p = e.features[0]?.properties; if (!p || p.wire) return;
+    new maplibregl.Popup({ closeButton: false, offset: 8 }).setLngLat(e.lngLat)
+      .setHTML(`<b>${t(p.type)}</b><br>${fmt(p.h)} m${p.est ? ' · ' + t('est3d') : ''}`).addTo(map3d);
+  });
+  map3d.on('mouseenter', 'obs', () => { map3d.getCanvas().style.cursor = 'pointer'; });
+  map3d.on('mouseleave', 'obs', () => { map3d.getCanvas().style.cursor = ''; });
+}
+function update3d() {
+  if (!map3d || !is3d || !map3d.getSource('obs')) return;
+  map3d.getSource('obs').setData(obstacles3d());
+  map3d.getSource('farm').setData(S.farmGeo || empty());
+  map3d.getSource('buf').setData(farmBuffer || empty());
+}
+function updateMe3d() { if (map3d && is3d && map3d.getSource('me')) map3d.getSource('me').setData(meGeo()); }
+async function toggle3d() {
+  if (is3d) return exit3d();
+  try { await loadMapLibre(); } catch { return toast(t('err3d')); }
+  const c = map.getCenter(), z = map.getZoom() - 1;   // MapLibre zoom levels are one below Leaflet's for the same scale
+  $('#map3d').classList.remove('hidden'); document.body.classList.add('is3d'); is3d = true;
+  $('#btn3d').classList.add('on3d'); $('#btn3d').textContent = '2D';
+  try {
+    if (!map3d) init3d(c, z);
+    else { map3d.resize(); map3d.jumpTo({ center: [c.lng, c.lat], zoom: z, pitch: 0, bearing: 0 }); map3d.getSource('sat')?.setTiles?.(sat3dTiles()); update3d(); updateMe3d(); }
+  } catch (e) { console.error(e); exit3d(); return toast(t('err3d')); }
+  // tilt only once the style is ready: animating the camera over terrain before that froze the render loop
+  const tilt = () => map3d.easeTo({ pitch: 62, bearing: -20, duration: 1400 });
+  // ('load' waits for every imagery tile, which may never arrive with a weak signal in the field)
+  if (map3d.style && map3d.style._loaded) tilt(); else map3d.once('style.load', tilt);
+  toast(t('hint3d'), 4000);
+}
+function exit3d() {
+  if (map3d) { const c = map3d.getCenter(); map.setView([c.lat, c.lng], Math.round(map3d.getZoom() + 1), { animate: false }); }
+  $('#map3d').classList.add('hidden'); document.body.classList.remove('is3d'); is3d = false;
+  $('#btn3d').classList.remove('on3d'); $('#btn3d').textContent = '3D';
 }
 
 // ---------------------------------------------------------------- obstacle import (KML/KMZ points)
@@ -524,7 +635,7 @@ function drawLines() {
   }
   activeLineDraft = L.polyline(lineMode ? lineLatLngs(lineMode) : [], { color: LINE_COLORS[lineMode?.kind] || '#f5c400', weight: 3.5, dashArray: '1 8', lineCap: 'round' }).addTo(gLines);
 }
-function refreshAll() { drawFeatures(); drawLines(); updateStats(); $('#farmTitle').textContent = S.farm || ''; }
+function refreshAll() { drawFeatures(); drawLines(); updateStats(); $('#farmTitle').textContent = S.farm || ''; update3d(); }
 
 async function openPopup(f, m) {
   let imgs = '';
@@ -1117,7 +1228,8 @@ function wire() {
   $('#gpsChip').onclick = () => fix ? map.setView([fix.lat, fix.lon], Math.max(map.getZoom(), 17)) : restartGps();
   $('#btnGpsRetry').onclick = restartGps;
   $('#btnGpsClose').onclick = () => $('#gpsBanner').classList.add('hidden');
-  $('#btnLocate').onclick = () => fix ? map.setView([fix.lat, fix.lon], Math.max(map.getZoom(), 17)) : toast(t('noFix'));
+  $('#btnLocate').onclick = () => !fix ? toast(t('noFix')) : is3d ? map3d.easeTo({ center: [fix.lon, fix.lat], zoom: Math.max(map3d.getZoom(), 16) }) : map.setView([fix.lat, fix.lon], Math.max(map.getZoom(), 17));
+  $('#btn3d').onclick = toggle3d;
   $('#btnTrack').onclick = () => setTracking(!tracking);
   $('#btnLine').onclick = startLine;
   $('#btnLineFinish').onclick = () => finishLine(false);
@@ -1170,4 +1282,4 @@ function wire() {
 })();
 
 // expose for tests
-window.__scout = { S, buildKml, computeAvg, zoneOf };
+window.__scout = { S, buildKml, computeAvg, zoneOf, map3d: () => map3d };
