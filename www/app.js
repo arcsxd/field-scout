@@ -229,11 +229,68 @@ function setBasemap(id, announce) {
   baseLayers = bm.make(); baseLayers.forEach((l, i) => { l.addTo(map); if (i === 0) l.bringToBack(); });
   S.basemap = bm.id;
   if (announce) toast(bm.name[S.lang] || bm.name.en);
+  imgCap = undefined; setTimeout(updateImageryDepth, 0);   // after start-up: the 3D view's state must exist first
 }
 function nextBasemap() {
   const i = BASEMAPS.findIndex(b => b.id === S.basemap);
   setBasemap(BASEMAPS[(i + 1) % BASEMAPS.length].id, true); persist();
 }
+// ---------------------------------------------------------------- imagery depth
+// Esri answers "Map data not yet available" for a zoom level it has no imagery for at that place
+// (rural Brazil often stops a level or two before cities). Ask its tile map which level really exists
+// around the map centre, request tiles only up to there and stop zooming there. Answers are kept per
+// ~10 km region (z12 tile). Offline or if the service does not answer, nothing changes.
+const IMG_TRY = 19, IMG_FLOOR = 13;
+const TILEMAP = {
+  sat: ESRI + 'World_Imagery/MapServer/tilemap/',
+  hybrid: ESRI + 'World_Imagery/MapServer/tilemap/',
+  clarity: 'https://clarity.maptiles.arcgis.com/arcgis/rest/services/World_Imagery/MapServer/tilemap/',
+};
+const IMG_KEYS = ['esri', 'esri-clarity'];
+let depthCache = {};
+try { depthCache = JSON.parse(localStorage.getItem('fs-depth') || '{}'); } catch {}
+let imgCap, depthSeq = 0;
+function tileXY(lat, lon, z) {
+  const n = 2 ** z, r = lat * Math.PI / 180;
+  return [Math.floor((lon + 180) / 360 * n), Math.floor((1 - Math.log(Math.tan(r) + 1 / Math.cos(r)) / Math.PI) / 2 * n)];
+}
+async function hasImagery(base, z, lat, lon) {
+  const [x, y] = tileXY(lat, lon, z);
+  const r = await fetch(`${base}${z}/${y}/${x}/1/1?f=json`, { mode: 'cors' });
+  if (!r.ok) throw new Error('tilemap ' + r.status);
+  const j = await r.json();
+  if (!j || !Array.isArray(j.data)) throw new Error('no tilemap data');
+  return j.data[0] === 1;
+}
+async function updateImageryDepth() {
+  const id = S.basemap, base = TILEMAP[id];
+  if (!base) return setImgCap(null);
+  const c = map.getCenter(), [rx, ry] = tileXY(c.lat, c.lng, 12), key = `${id}/${rx}/${ry}`;
+  if (depthCache[key] != null) return setImgCap(depthCache[key]);
+  const seq = ++depthSeq;
+  try {
+    let z = IMG_TRY;
+    while (z > IMG_FLOOR && !(await hasImagery(base, z, c.lat, c.lng))) z--;
+    if (seq !== depthSeq || S.basemap !== id) return;
+    depthCache[key] = z;
+    try { localStorage.setItem('fs-depth', JSON.stringify(depthCache)); } catch {}
+    setImgCap(z);
+  } catch (e) { console.warn('imagery depth unknown here', e); }
+}
+function setImgCap(z) {
+  if (z === imgCap) return;
+  imgCap = z;
+  for (const l of baseLayers) {
+    if (!IMG_KEYS.includes(l.options.cacheKey)) continue;
+    l.options.maxNativeZoom = z ?? (l.options.cacheKey === 'esri' ? 18 : 19);
+    if (l._map) l._resetView();
+  }
+  map.setMaxZoom(z ?? 21);          // zooms out by itself if the view is deeper than the imagery
+  syncSat3d();
+}
+let depthTimer;
+map.on('moveend', () => { clearTimeout(depthTimer); depthTimer = setTimeout(updateImageryDepth, 300); });
+
 setBasemap('sat');
 
 const gFarm = L.layerGroup().addTo(map);
@@ -442,7 +499,7 @@ function init3d(c, z) {
     style: {
       version: 8,
       sources: {
-        sat: { type: 'raster', tiles: sat3dTiles(), tileSize: 256, maxzoom: 19, attribution: 'Imagery © Esri, Maxar, Earthstar' },
+        sat: { type: 'raster', tiles: sat3dTiles(), tileSize: 256, maxzoom: imgCap ?? 19, attribution: 'Imagery © Esri, Maxar, Earthstar' },
         dem: { type: 'raster-dem', tiles: ['https://s3.amazonaws.com/elevation-tiles-prod/terrarium/{z}/{x}/{y}.png'], tileSize: 256, maxzoom: 15, encoding: 'terrarium', attribution: 'Terrain: Mapzen, AWS' },
         obs: { type: 'geojson', data: obstacles3d() },
         farm: { type: 'geojson', data: S.farmGeo || empty() },
@@ -463,6 +520,7 @@ function init3d(c, z) {
     },
   });
   map3d.addControl(new maplibregl.NavigationControl({ visualizePitch: true }), 'bottom-right');
+  sat3dKey = sat3dTiles()[0] + '|' + (imgCap ?? 19); map3d.setMaxZoom((imgCap ?? 21) - 1);
   map3d.on('zoomend', () => {   // re-size footprints when the zoom changed enough to matter
     const r = minRadius3d();
     if (Math.abs(r - minR3d) > minR3d * 0.25 || (r < 1) !== (minR3d < 1)) { minR3d = r; map3d.getSource('obs')?.setData(obstacles3d()); }
@@ -474,6 +532,20 @@ function init3d(c, z) {
   });
   map3d.on('mouseenter', 'obs', () => { map3d.getCanvas().style.cursor = 'pointer'; });
   map3d.on('mouseleave', 'obs', () => { map3d.getCanvas().style.cursor = ''; });
+}
+// keep the 3D imagery on the same basemap and depth as 2D (MapLibre zoom = Leaflet zoom - 1)
+let sat3dKey = '';
+function syncSat3d() {
+  if (!map3d || !map3d.getLayer('sat')) return;
+  const mz = imgCap ?? 19, key = sat3dTiles()[0] + '|' + mz;
+  map3d.setMaxZoom((imgCap ?? 21) - 1);
+  if (key === sat3dKey) return;
+  sat3dKey = key;
+  try {
+    map3d.removeLayer('sat'); map3d.removeSource('sat');
+    map3d.addSource('sat', { type: 'raster', tiles: sat3dTiles(), tileSize: 256, maxzoom: mz, attribution: 'Imagery © Esri, Maxar, Earthstar' });
+    map3d.addLayer({ id: 'sat', type: 'raster', source: 'sat' }, 'farm-fill');
+  } catch (e) { console.warn('3D imagery refresh failed', e); }
 }
 function update3d() {
   if (!map3d || !is3d || !map3d.getSource('obs')) return;
@@ -491,7 +563,7 @@ async function toggle3d() {
   $('#btn3d').classList.add('on3d'); $('#btn3d').textContent = '2D';
   try {
     if (!map3d) init3d(c, z);
-    else { map3d.resize(); map3d.jumpTo({ center: [c.lng, c.lat], zoom: z, pitch: 0, bearing: 0 }); map3d.getSource('sat')?.setTiles?.(sat3dTiles()); update3d(); updateMe3d(); }
+    else { map3d.resize(); map3d.jumpTo({ center: [c.lng, c.lat], zoom: z, pitch: 0, bearing: 0 }); syncSat3d(); update3d(); updateMe3d(); }
   } catch (e) { console.error(e); exit3d(); return toast(t('err3d')); }
   // tilt only once the style is ready: animating the camera over terrain before that froze the render loop
   const tilt = () => map3d.easeTo({ pitch: 62, bearing: -20, duration: 1400 });
