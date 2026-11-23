@@ -38,6 +38,11 @@ const I18N = {
     sheetTitleLine:'(line)', addToLine:'Added to line', untitled:'Untitled farm',
     accGood:'Good GPS accuracy', accMid:'Fair accuracy — average a bit longer', accPoor:'Poor accuracy — wait, move to open sky or mark on map',
     dupNear:'{type} already marked {d} m away — possible duplicate', fromLast:'from last pole', byType:'By type', lineKm:'Lines', trackKm:'Track',
+    secImport:'Import', importObs:'Import obstacles KML/KMZ', reviewImport:'Review imported obstacles', reviewTitle:'Review import',
+    reviewSub:'{n} imported · {u} to classify', fTodo:'To classify', fAll:'All imported', bulkLbl:'Set every unclassified obstacle as', done:'Done',
+    importDone:'{n} obstacles imported · {u} to classify', importLines:'{l} lines rebuilt', importLine1:'1 line rebuilt', importDup:'{d} already on the map were skipped', importDup1:'1 was already on the map and was skipped',
+    importNone:'No points found in this file', importAreasOnly:'This file only has areas. Use Import farm KML/KMZ.', mImport:'Imported',
+    reviewEmpty:'Every imported obstacle is classified.', srcLbl:'KML name', toClassify:'To classify', typeLbl:'Type', classified:'Classified',
     heightShort:'Height', statObs:'Obstacles', statLines:'Lines', statTrack:'Track', secSession:'Session', secExport:'Export', secFarm:'Farm boundaries', secView:'View',
     accLbl:'Accuracy', methodLbl:'Method', movedLbl:'moved', listEmpty:'No obstacles yet. Tap a type at the bottom of the map to mark one.',
     coach:'Tap a type to mark an obstacle at your position', lineHint:'Save poles in order', tapTitle:'Pick on map', sheetSub:'New obstacle', sheetSubEdit:'Editing'
@@ -75,6 +80,11 @@ const I18N = {
     sheetTitleLine:'(linha)', addToLine:'Adicionado à linha', untitled:'Fazenda sem nome',
     accGood:'Precisão do GPS boa', accMid:'Precisão razoável — faça a média por mais tempo', accPoor:'Precisão ruim — aguarde, vá para céu aberto ou marque no mapa',
     dupNear:'{type} já marcado a {d} m — possível duplicado', fromLast:'do último poste', byType:'Por tipo', lineKm:'Linhas', trackKm:'Trilha',
+    secImport:'Importar', importObs:'Importar obstáculos KML/KMZ', reviewImport:'Revisar obstáculos importados', reviewTitle:'Revisar importação',
+    reviewSub:'{n} importados · {u} a classificar', fTodo:'A classificar', fAll:'Todos importados', bulkLbl:'Classificar todos os pendentes como', done:'Concluir',
+    importDone:'{n} obstáculos importados · {u} a classificar', importLines:'{l} linhas reconstruídas', importLine1:'1 linha reconstruída', importDup:'{d} já estavam no mapa e foram ignorados', importDup1:'1 já estava no mapa e foi ignorado',
+    importNone:'Nenhum ponto encontrado neste arquivo', importAreasOnly:'Este arquivo só tem áreas. Use Importar KML/KMZ da fazenda.', mImport:'Importado',
+    reviewEmpty:'Todos os obstáculos importados estão classificados.', srcLbl:'Nome no KML', toClassify:'A classificar', typeLbl:'Tipo', classified:'Classificado',
     heightShort:'Altura', statObs:'Obstáculos', statLines:'Linhas', statTrack:'Trilha', secSession:'Sessão', secExport:'Exportar', secFarm:'Limites da fazenda', secView:'Visualizar',
     accLbl:'Precisão', methodLbl:'Método', movedLbl:'movido', listEmpty:'Nenhum obstáculo ainda. Toque em um tipo na parte de baixo do mapa para marcar.',
     coach:'Toque em um tipo para marcar um obstáculo na sua posição', lineHint:'Salve os postes em ordem', tapTitle:'Marcar no mapa', sheetSub:'Novo obstáculo', sheetSubEdit:'Editando'
@@ -344,16 +354,18 @@ function zoneOf(lat, lon) {
 }
 const zoneLabel = z => ({ spray_area: t('inSpray'), within_1_5km: t('inBuffer'), beyond_1_5km: t('outside') })[z] || '';
 
+async function readKml(file) {
+  let text;
+  if (/\.kmz$/i.test(file.name) || file.type.includes('kmz')) {
+    const zip = await JSZip.loadAsync(file);
+    const kmlName = Object.keys(zip.files).find(n => /\.kml$/i.test(n));
+    text = await zip.file(kmlName).async('string');
+  } else text = await file.text();
+  return toGeoJSON.kml(new DOMParser().parseFromString(text, 'text/xml'));
+}
 async function importFarm(file) {
   try {
-    let text;
-    if (/\.kmz$/i.test(file.name) || file.type.includes('kmz')) {
-      const zip = await JSZip.loadAsync(file);
-      const kmlName = Object.keys(zip.files).find(n => /\.kml$/i.test(n));
-      text = await zip.file(kmlName).async('string');
-    } else text = await file.text();
-    const dom = new DOMParser().parseFromString(text, 'text/xml');
-    const gj = toGeoJSON.kml(dom);
+    const gj = await readKml(file);
     if (!gj.features.length) throw new Error('empty');
     S.farmGeo = gj;
     if (!S.farm) { S.farm = file.name.replace(/\.(kml|kmz)$/i, ''); }
@@ -361,6 +373,127 @@ async function importFarm(file) {
     map.fitBounds(L.geoJSON(gj).getBounds(), { padding: [30, 30] });
     toast(t('farmLoaded'));
   } catch (e) { console.error(e); toast(t('farmErr')); }
+}
+
+// ---------------------------------------------------------------- obstacle import (KML/KMZ points)
+// Points become obstacles. The type comes from a Field Scout export's own data when present,
+// otherwise from keywords in the placemark name (PT/EN). Anything unrecognised is "other" and
+// flagged for review.
+const norm = s => String(s || '').toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '');
+const NAME_RULES = [
+  ['pivot',    /\b(pivo|pivos|pivot|pivots|center pivot|irrigac\w*|irrigat\w*|aspersor\w*)\b/],
+  ['tower',    /\b(torre|torres|tower|towers|antena|antenas|antenna|antennas|mastro|mast|erb|telecom|radio|celular|repetidora)\b/],
+  ['building', /\b(casa|casas|galpao|galpoes|barracao|barracoes|armazem|armazens|silo|silos|sede|predio|predios|edifica\w*|constru\w*|igreja|escola|curral|granja|aviario|caixa d.?agua|reservatorio|building|buildings|house|shed|barn|warehouse|tank)\b/],
+  ['pole',     /\b(poste|postes|pole|poles|post|posts|pt|estrutura)\b|^p\s*[-_.]?\s*\d+\b/],
+];
+function classifyPlacemark(props) {
+  const own = norm(props.type);
+  if (TYPE[own] && !TYPE[own].retired) return { type: own, known: true };
+  const n = norm(props.name);
+  for (const [type, re] of NAME_RULES) if (re.test(n)) return { type, known: true };
+  return { type: 'other', known: false };
+}
+function heightFrom(props) {
+  const h = parseFloat(props.height_agl_m);
+  if (!isNaN(h)) return h;
+  const m = String(props.name || '').match(/(\d+(?:[.,]\d+)?)\s*m\b/i);
+  return m ? parseFloat(m[1].replace(',', '.')) : null;
+}
+async function importObstacles(file) {
+  let gj;
+  try { gj = await readKml(file); } catch (e) { console.error(e); return toast(t('farmErr')); }
+  const near = (lat, lon, list, m) => list.find(f => turf.distance([f.lon, f.lat], [lon, lat], { units: 'meters' }) <= m);
+  const pts = gj.features.filter(f => f.geometry && f.geometry.type === 'Point');
+  if (!pts.length) return toast(t(gj.features.some(f => f.geometry && /Polygon/.test(f.geometry.type)) ? 'importAreasOnly' : 'importNone'), 3500);
+  const added = []; let dup = 0;
+  for (const p of pts) {
+    const [lon, lat] = p.geometry.coordinates, props = p.properties || {};
+    if (near(lat, lon, S.features, 1) || near(lat, lon, added, 1)) { dup++; continue; }
+    const c = classifyPlacemark(props);
+    added.push({ id: uid(), ts: Date.now(), op: S.operator, type: c.type, lat: +lat.toFixed(7), lon: +lon.toFixed(7), acc: null, method: 'import',
+                 height: heightFrom(props), width: null, notes: '', photos: [], srcName: String(props.name || '').trim(), review: !c.known });
+  }
+  // rebuild lines whose every vertex lands on an imported or existing obstacle
+  const pool = [...S.features, ...added], newLines = [];
+  for (const g of gj.features.filter(f => f.geometry && f.geometry.type === 'LineString')) {
+    const ids = g.geometry.coordinates.map(([lon, lat]) => near(lat, lon, pool, 2)?.id);
+    if (ids.length < 2 || ids.some(x => !x)) continue;
+    const kind = /\b(estai|estais|guy|stay)\b/.test(norm(g.properties?.name)) ? 'guy' : 'power';
+    const line = { id: uid(), kind, pointIds: ids, ts: Date.now(), op: S.operator };
+    ids.forEach(id => { const f = pool.find(x => x.id === id); if (f && !f.lineId) f.lineId = line.id; });
+    newLines.push(line);
+  }
+  S.features.push(...added); S.lines.push(...newLines);
+  S.undo.push({ op: 'import', ids: added.map(f => f.id), lineIds: newLines.map(l => l.id) });
+  persist(); refreshAll();
+  if (added.length) map.fitBounds(L.latLngBounds(added.map(f => [f.lat, f.lon])), { padding: [60, 60], maxZoom: 17 });
+  const todo = added.filter(f => f.review).length;
+  const extra = [];
+  if (newLines.length) extra.push(newLines.length === 1 ? t('importLine1') : t('importLines').replace('{l}', newLines.length));
+  if (dup) extra.push(dup === 1 ? t('importDup1') : t('importDup').replace('{d}', dup));
+  if (todo) openReview('todo', extra.join(' · '));   // the sheet shows the counts; no toast over it
+  else toast([t('importDone').replace('{n}', added.length).replace('{u}', 0), ...extra].join(' · '), 4500);
+}
+
+// ---------------------------------------------------------------- review / classify imported obstacles
+function typePick(cur, onPick) {
+  const el = document.createElement('div'); el.className = 'typePick';
+  TYPES.filter(ty => !ty.retired).forEach(ty => {
+    const b = document.createElement('button'); b.type = 'button'; b.className = 'tp' + (ty.id === cur ? ' on' : '');
+    b.style.setProperty('--c', ty.color); b.innerHTML = `${ty.svg}<span>${t(ty.id)}</span>`;
+    b.onclick = () => { el.querySelectorAll('.tp').forEach(x => x.classList.toggle('on', x === b)); onPick(ty.id); };
+    el.appendChild(b);
+  });
+  return el;
+}
+let reviewFilter = 'todo', reviewNote = '';
+const imported = () => S.features.filter(f => f.method === 'import' || f.srcName);
+function retype(list, type) {
+  if (!list.length) return;
+  S.undo.push({ op: 'retype', prev: list.map(f => [f.id, f.type, !!f.review]) });
+  list.forEach(f => { f.type = type; f.review = false; });
+  persist(); refreshAll();
+}
+function openReview(filter, note = '') {
+  closeAllSheets();
+  if (filter) reviewFilter = filter;
+  reviewNote = note;
+  renderReview();
+  $('#review').classList.remove('hidden');
+}
+function renderReview() {
+  const all = imported(), todo = all.filter(f => f.review);
+  if (reviewFilter === 'todo' && !todo.length && all.length) reviewFilter = 'all';
+  $('#reviewSub').textContent = t('reviewSub').replace('{n}', all.length).replace('{u}', todo.length);
+  $('#reviewNote').textContent = reviewNote; $('#reviewNote').classList.toggle('hidden', !reviewNote);
+  $('#fTodo').textContent = `${t('fTodo')} · ${todo.length}`; $('#fAll').textContent = `${t('fAll')} · ${all.length}`;
+  $('#fTodo').classList.toggle('on', reviewFilter === 'todo'); $('#fAll').classList.toggle('on', reviewFilter === 'all');
+  const bulk = $('#reviewBulk'); bulk.classList.toggle('hidden', !todo.length);
+  const bp = $('#bulkPick'); bp.innerHTML = ''; bp.appendChild(typePick(null, type => { retype(imported().filter(f => f.review), type); toast(t('classified')); renderReview(); }));
+  const body = $('#reviewBody'); body.innerHTML = '';
+  const rows = (reviewFilter === 'todo' ? todo : [...all].sort((a, b) => (b.review ? 1 : 0) - (a.review ? 1 : 0)));
+  if (!rows.length) body.innerHTML = `<div class="empty">${svg('<path d="m5 12.5 4.5 4.5L19 7.5"/>')}<p>${t('reviewEmpty')}</p></div>`;
+  rows.forEach((f, i) => {
+    const row = document.createElement('div'); row.className = 'rv'; row.style.setProperty('--i', Math.min(i, 12));
+    row.innerHTML = `<div class="rvHead"><div class="rvName">${escapeHtml(f.srcName || t(f.type))}<small>${f.lat.toFixed(5)}, ${f.lon.toFixed(5)}${f.height ? ' · ' + fmt(f.height) + ' m' : ''}</small></div>`
+      + `<span class="rvState${f.review ? '' : ' ok'}">${f.review ? t('toClassify') : t('classified')}</span>`
+      + `<button class="btn icon rvGo" aria-label="Show on map">${svg('<circle cx="12" cy="12" r="7"/><path d="M12 2v3M12 19v3M2 12h3M19 12h3"/>')}</button></div>`;
+    row.appendChild(typePick(f.type, type => {
+      retype([f], type);
+      const st = row.querySelector('.rvState'); st.textContent = t('classified'); st.classList.add('ok');
+      $('#reviewSub').textContent = t('reviewSub').replace('{n}', imported().length).replace('{u}', imported().filter(x => x.review).length);
+      $('#fTodo').textContent = `${t('fTodo')} · ${imported().filter(x => x.review).length}`;
+      $('#reviewBulk').classList.toggle('hidden', !imported().some(x => x.review));
+    }));
+    row.querySelector('.rvGo').onclick = () => { closeAllSheets(); map.setView([f.lat, f.lon], 19); setTimeout(() => markerById.get(f.id)?.fire('click'), 300); };
+    body.appendChild(row);
+  });
+  updateReviewBadge();
+}
+function updateReviewBadge() {
+  const all = imported(), n = all.filter(f => f.review).length;
+  $('#btnReview').classList.toggle('hidden', !all.length);
+  $('#reviewBadge').textContent = n; $('#reviewBadge').classList.toggle('hidden', !n);
 }
 
 // ---------------------------------------------------------------- obstacle markers + lines
@@ -405,6 +538,7 @@ async function openPopup(f, m) {
     <div class="popHead"><span class="typeIc sm" style="--c:${ty.color}">${ty.svg}</span><div class="popTitle"><b>${t(f.type)}</b>${lineKind ? `<span>${lineKind}</span>` : ''}</div>${z ? `<span class="zone ${z}">${zoneLabel(z)}</span>` : ''}</div>
     <dl class="kv">${kv(t('heightShort'), f.height != null ? fmt(f.height) + ' m' : '—')}${kv(t('accLbl'), f.acc != null ? '±' + fmt(f.acc, 0) + ' m' : '—')}${kv(t('methodLbl'), methodLabel(f.method))}${f.width ? kv(t('width'), fmt(f.width) + ' m') : ''}</dl>
     <div class="mono coords">${f.lat.toFixed(6)}, ${f.lon.toFixed(6)}</div>
+    ${f.srcName ? `<div class="src"><span>${t('srcLbl')}</span> ${escapeHtml(f.srcName)}${f.review ? ` <em>${t('toClassify')}</em>` : ''}</div>` : ''}
     ${f.notes ? '<p class="notes">' + escapeHtml(f.notes) + '</p>' : ''}${imgs ? '<div class="popImgs">' + imgs + '</div>' : ''}
     <div class="pbtns"><button data-a="edit">${t('edit')}</button><button data-a="move">${t('move')}</button><button data-a="del" class="danger">${t('del')}</button></div></div>`;
   m.bindPopup(html, { autoPanPaddingTopLeft: [12, 72], autoPanPaddingBottomRight: [68, 110], maxWidth: 300 }).openPopup();
@@ -422,7 +556,7 @@ async function openPopup(f, m) {
 }
 function methodLabel(m) {
   const [base, moved] = String(m || '').split('+');
-  return ({ gps: t('mGps'), map: t('mMap'), bearing: t('mBearing') })[base] + (moved ? ' · ' + t('movedLbl') : '');
+  return ({ gps: t('mGps'), map: t('mMap'), bearing: t('mBearing'), import: t('mImport') })[base] + (moved ? ' · ' + t('movedLbl') : '');
 }
 const escapeHtml = s => String(s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c]);
 
@@ -449,6 +583,12 @@ function undo() {
     const f = S.features.find(x => x.id === u.id); if (f) { f.lat = u.old.lat; f.lon = u.old.lon; f.method = f.method.replace(/\+moved$/, ''); }
   } else if (u.op === 'line') {
     S.lines = S.lines.filter(l => l.id !== u.id);
+  } else if (u.op === 'import') {
+    S.features = S.features.filter(f => !u.ids.includes(f.id));
+    S.lines = S.lines.filter(l => !u.lineIds.includes(l.id));
+    S.features.forEach(f => { if (u.lineIds.includes(f.lineId)) delete f.lineId; });
+  } else if (u.op === 'retype') {
+    for (const [id, type, review] of u.prev) { const f = S.features.find(x => x.id === id); if (f) { f.type = type; f.review = review; } }
   }
   persist(); refreshAll(); toast(t('undone'));
 }
@@ -494,6 +634,11 @@ function openSheet(type, editing = null) {
   const ic = $('#sheetIcon'); ic.innerHTML = ty.svg; ic.style.setProperty('--c', ty.color);
   $('#sheetTitle').textContent = t(type);
   $('#sheetSub').textContent = editing ? t('sheetSubEdit') : (lineMode ? t('lineKind_' + lineMode.kind) + ' · #' + (lineMode.pointIds.length + 1) : t('sheetSub'));
+  const tp = $('#sheetTypePick'); tp.innerHTML = ''; tp.classList.toggle('hidden', !editing);
+  if (editing) tp.appendChild(typePick(type, id => {
+    cap.type = id; const t2 = TYPE[id];
+    ic.innerHTML = t2.svg; ic.style.setProperty('--c', t2.color); $('#sheetTitle').textContent = t(id);
+  }));
   $('#inHeight').value = editing?.height ?? (lastHeight[type] ?? '');
   $('#inWidth').value = editing?.width ?? '';
   $('#inNotes').value = editing?.notes ?? '';
@@ -522,7 +667,7 @@ function moveTabInd() {
   ind.style.width = a.offsetWidth + 'px'; ind.style.transform = 'translateX(' + a.offsetLeft + 'px)';
 }
 function updateSaveBtn() { $('#btnSave').disabled = !(cap && cap.pos); }
-function closeAllSheets() { ['#sheet', '#menu', '#list'].forEach(s => $(s).classList.add('hidden')); if (lineMode) $('#lineBanner').classList.remove('hidden'); stopAvg(); stopCompass(); cancelTapPick(); clearPreview(); }
+function closeAllSheets() { reviewNote = ''; ['#sheet', '#menu', '#list', '#review'].forEach(s => $(s).classList.add('hidden')); if (lineMode) $('#lineBanner').classList.remove('hidden'); stopAvg(); stopCompass(); cancelTapPick(); clearPreview(); }
 
 // GPS averaging (weighted by 1/acc²)
 let avg = null;
@@ -670,7 +815,7 @@ async function saveCapture() {
   if (cap.method === 'bearing') data.bearing = { from: cap.pos.from, deg: cap.pos.bearing, dist_m: cap.pos.dist };
   if (!isNaN(h)) lastHeight[cap.type] = h;
   if (cap.editing) {
-    Object.assign(cap.editing, data);
+    Object.assign(cap.editing, data, { review: false });
   } else {
     const f = { id: uid(), ts: Date.now(), op: S.operator, ...data };
     if (lineMode) { f.lineId = lineMode.id; lineMode.pointIds.push(f.id); }
@@ -706,7 +851,7 @@ function buildKml(withPhotos) {
     if (withPhotos) desc += (f.photos || []).map(p => `<br/><img src="files/${p}.jpg" width="400"/>`).join('');
     return `<Placemark><name>${kmlEsc(name)}</name><styleUrl>#t_${f.type}</styleUrl><description><![CDATA[${desc}]]></description>`
       + ext({ type: f.type, type_label: EN[f.type], height_agl_m: f.height, width_m: f.width, accuracy_m: f.acc, method: f.method,
-              line_id: f.lineId, line_kind: f.lineId ? lineKindOf(f.lineId) : null, zone: z, notes: f.notes, operator: f.op,
+              line_id: f.lineId, line_kind: f.lineId ? lineKindOf(f.lineId) : null, zone: z, notes: f.notes, operator: f.op, source_name: f.srcName,
               timestamp: new Date(f.ts).toISOString(), bearing_deg: f.bearing?.deg, distance_m: f.bearing?.dist_m, photos: (f.photos || []).length || null })
       + `<Point><coordinates>${f.lon},${f.lat},0</coordinates></Point></Placemark>`;
   };
@@ -769,8 +914,8 @@ async function exportKmz() {
 }
 async function exportCsv() {
   if (!S.features.length) return toast(t('exportEmpty'));
-  const head = ['id', 'type', 'lat', 'lon', 'height_agl_m', 'width_m', 'accuracy_m', 'method', 'line_id', 'zone', 'notes', 'operator', 'timestamp'];
-  const rows = S.features.map(f => [f.id, EN[f.type], f.lat, f.lon, f.height ?? '', f.width ?? '', f.acc ?? '', f.method, f.lineId ?? '', zoneOf(f.lat, f.lon), f.notes, f.op, new Date(f.ts).toISOString()]
+  const head = ['id', 'type', 'lat', 'lon', 'height_agl_m', 'width_m', 'accuracy_m', 'method', 'line_id', 'zone', 'notes', 'operator', 'timestamp', 'source_name'];
+  const rows = S.features.map(f => [f.id, EN[f.type], f.lat, f.lon, f.height ?? '', f.width ?? '', f.acc ?? '', f.method, f.lineId ?? '', zoneOf(f.lat, f.lon), f.notes, f.op, new Date(f.ts).toISOString(), f.srcName ?? '']
     .map(v => `"${String(v ?? '').replace(/"/g, '""')}"`).join(','));
   await shareBlob(new Blob([head.join(',') + '\n' + rows.join('\n')], { type: 'text/csv' }), fileBase() + '.csv', 'text/csv');
 }
@@ -783,6 +928,7 @@ function updateStats() {
   $('#stats').innerHTML = tile(S.features.length, '', t('statObs')) + tile(S.lines.length, ' · ' + (lineM / 1000).toFixed(1) + ' km', t('statLines'))
     + tile((trackStats.m / 1000).toFixed(1), ' km', t('statTrack'));
   $('#coach').classList.toggle('hidden', S.features.length > 0);
+  updateReviewBadge();
 }
 function openList() {
   closeAllSheets();
@@ -792,7 +938,7 @@ function openList() {
   [...S.features].reverse().forEach((f, i) => {
     const ty = TYPE[f.type] || TYPE.other;
     const row = document.createElement('button'); row.className = 'li'; row.style.setProperty('--i', Math.min(i, 12));
-    row.innerHTML = `<span class="typeIc sm" style="--c:${ty.color}">${ty.svg}</span><span class="meta"><b>${t(f.type)}${f.height ? ` <em>${fmt(f.height)} m</em>` : ''}</b><span class="mono muted">${f.lat.toFixed(5)}, ${f.lon.toFixed(5)} · ${f.acc != null ? '±' + fmt(f.acc, 0) + ' m' : t('mMap')}</span>${f.notes ? `<span class="note">${escapeHtml(f.notes)}</span>` : ''}</span><span class="time mono muted">${new Date(f.ts).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</span>${svg('<path d="m9 6 6 6-6 6"/>')}`;
+    row.innerHTML = `<span class="typeIc sm" style="--c:${ty.color}">${ty.svg}</span><span class="meta"><b>${t(f.type)}${f.height ? ` <em>${fmt(f.height)} m</em>` : ''}</b><span class="mono muted">${f.lat.toFixed(5)}, ${f.lon.toFixed(5)} · ${f.acc != null ? '±' + fmt(f.acc, 0) + ' m' : methodLabel(f.method)}</span>${f.notes ? `<span class="note">${escapeHtml(f.notes)}</span>` : ''}${f.srcName ? `<span class="note">${t('srcLbl')}: ${escapeHtml(f.srcName)}${f.review ? ` · <b class="todo">${t('toClassify')}</b>` : ''}</span>` : ''}</span><span class="time mono muted">${new Date(f.ts).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</span>${svg('<path d="m9 6 6 6-6 6"/>')}`;
     row.onclick = () => { closeAllSheets(); map.setView([f.lat, f.lon], 19); setTimeout(() => markerById.get(f.id)?.fire('click'), 300); };
     body.appendChild(row);
   });
@@ -983,6 +1129,11 @@ function wire() {
   $('#inPhoto').onchange = e => { [...e.target.files].forEach(addPhoto); e.target.value = ''; };
   $('#btnSave').onclick = saveCapture;
   $('#inKml').onchange = e => { const f = e.target.files[0]; if (f) importFarm(f); e.target.value = ''; closeAllSheets(); };
+  $('#inObsKml').onchange = e => { const f = e.target.files[0]; e.target.value = ''; closeAllSheets(); if (f) importObstacles(f); };
+  $('#btnReview').onclick = () => openReview(imported().some(f => f.review) ? 'todo' : 'all');
+  $('#btnReviewClose').onclick = closeAllSheets; $('#btnReviewDone').onclick = closeAllSheets;
+  $('#fTodo').onclick = () => { reviewFilter = 'todo'; renderReview(); };
+  $('#fAll').onclick = () => { reviewFilter = 'all'; renderReview(); };
   $('#btnClearFarm').onclick = () => { S.farmGeo = null; drawFarm(); persist(); toast(t('noFarm')); };
   $('#btnExportKml').onclick = exportKml;
   $('#btnExportKmz').onclick = exportKmz;
