@@ -85,6 +85,9 @@ svg[aria-hidden] .fill{fill:currentColor;stroke:none}
 
 /* ---------- sheets ---------- */
 .sheet{position:absolute;left:0;right:0;bottom:0;z-index:1100;max-height:88vh;overflow:auto;overscroll-behavior:contain;background:var(--panel);border-top:1px solid var(--line);border-radius:22px 22px 0 0;padding:8px 16px calc(var(--safe-bot) + 16px);display:flex;flex-direction:column;gap:12px;box-shadow:0 -12px 48px rgba(0,0,0,.6),var(--hair)}
+/* sheets scroll; their sections must keep their own height instead of shrinking to fit
+   (cards with overflow:hidden would otherwise collapse to zero and their buttons disappear) */
+.sheet>*{flex-shrink:0}
 .sheet::before{content:"";flex:none;width:38px;height:5px;border-radius:3px;background:var(--line2);align-self:center;margin-bottom:2px}
 .sheet-head{display:flex;align-items:center;gap:12px;padding:2px 0 4px}
 .headTxt{flex:1;min-width:0;display:flex;flex-direction:column;gap:1px}
@@ -157,7 +160,7 @@ select{width:auto}
 .card.form{padding:14px;display:flex;flex-direction:column;gap:12px}
 .card.form input{background:var(--bg)}
 .card.rows{overflow:hidden}
-.rowBtn{display:flex;align-items:center;gap:12px;width:100%;padding:11px 12px;border:0;background:transparent;color:var(--text);font-size:15px;font-weight:500;text-align:left;text-transform:none;letter-spacing:0;cursor:pointer}
+.rowBtn{display:flex;flex-direction:row;align-items:center;gap:12px;width:100%;padding:11px 12px;border:0;background:transparent;color:var(--text);font-size:15px;font-weight:500;text-align:left;text-transform:none;letter-spacing:0;cursor:pointer}
 .rowBtn+.rowBtn{border-top:1px solid var(--line)}
 .rowBtn>span:not(.rIc){flex:1}
 .rowBtn:active{background:var(--panel3)}
