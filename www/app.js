@@ -22,9 +22,7 @@ const I18N = {
     listFeatures:'Obstacle list', toggleLayer:'Switch map layer', newSession:'New session (erase all)',
     gpsWait:'GPS…', gpsNone:'No GPS', gpsOff:'Off', gpsDeniedTitle:'Location is blocked',
     gpsDeniedIos:'iPhone: Settings → Privacy & Security → Location Services → Safari Websites → While Using the App. Also check aA → Website Settings → Location → Allow.',
-    gpsDeniedOther:'Allow location for this site in the browser settings, then tap Try again.', gpsUnavail:'No GPS signal yet. Move to open sky.', retry:'Try again', gateTitle:'Turn on location', gateText:'Field Scout opens the map at your position. Allow location access to start.',
-    gateBtn:'Use my location', gateWait:'Finding your position…', gateNoSignal:'No signal yet. Move to open sky or near a window; it keeps trying.',
-    gateNoGeo:'This browser cannot share its location. Open Field Scout in Safari, Chrome or Edge.', samples:'samples', spread:'spread',
+    gpsDeniedOther:'Allow location for this site in the browser settings, then tap Try again.', gpsUnavail:'No GPS signal yet. Move to open sky.', retry:'Try again', samples:'samples', spread:'spread',
     saved:'Saved', deleted:'Deleted', undone:'Undone', nothingUndo:'Nothing to undo',
     trackOn:'Track recording ON', trackOff:'Track recording OFF',
     lineStart:'Line mode: every pole you save is added to this line',
@@ -67,9 +65,7 @@ const I18N = {
     listFeatures:'Lista de obstáculos', toggleLayer:'Trocar camada do mapa', newSession:'Nova sessão (apaga tudo)',
     gpsWait:'GPS…', gpsNone:'Sem GPS', gpsOff:'Desligado', gpsDeniedTitle:'Localização bloqueada',
     gpsDeniedIos:'iPhone: Ajustes → Privacidade e Segurança → Serviços de Localização → Sites do Safari → Durante o Uso do App. Confira também aA → Ajustes do Site → Localização → Permitir.',
-    gpsDeniedOther:'Permita a localização para este site nos ajustes do navegador e toque em Tentar de novo.', gpsUnavail:'Ainda sem sinal de GPS. Vá para céu aberto.', retry:'Tentar de novo', gateTitle:'Ative a localização', gateText:'O Field Scout abre o mapa na sua posição. Permita o acesso à localização para começar.',
-    gateBtn:'Usar minha localização', gateWait:'Buscando sua posição…', gateNoSignal:'Ainda sem sinal. Vá para céu aberto ou perto de uma janela; continua tentando.',
-    gateNoGeo:'Este navegador não informa a localização. Abra o Field Scout no Safari, Chrome ou Edge.', samples:'amostras', spread:'dispersão',
+    gpsDeniedOther:'Permita a localização para este site nos ajustes do navegador e toque em Tentar de novo.', gpsUnavail:'Ainda sem sinal de GPS. Vá para céu aberto.', retry:'Tentar de novo', samples:'amostras', spread:'dispersão',
     saved:'Salvo', deleted:'Apagado', undone:'Desfeito', nothingUndo:'Nada para desfazer',
     trackOn:'Gravando trilha', trackOff:'Trilha parada',
     lineStart:'Modo linha: cada ponto salvo entra nesta linha',
@@ -193,8 +189,7 @@ const deskMQ = window.matchMedia ? matchMedia('(min-width: 900px) and (pointer: 
 const isDesk = () => deskMQ.matches;
 
 // ---------------------------------------------------------------- map
-// No fixed start point: the map stays behind the location gate until the first GPS fix centres it.
-const map = L.map('map', { zoomControl: false, attributionControl: true, maxZoom: 21 }).setView([-14.2, -51.9], 4);
+const map = L.map('map', { zoomControl: false, attributionControl: true, maxZoom: 21 }).setView([-12.15, -45.0], 13);
 
 // Tile layer that caches every tile you view in IndexedDB (for no-signal areas)
 const CachedLayer = L.TileLayer.extend({
@@ -255,35 +250,8 @@ const fixListeners = new Set();
 const meMarker = L.marker([0, 0], { icon: L.divIcon({ className: '', html: '<div class="me-marker"></div>', iconSize: [18, 18] }), interactive: false });
 const meAcc = L.circle([0, 0], { radius: 1, color: '#4aa3f0', weight: 1, opacity: .6, fillOpacity: .1, interactive: false });
 
-// ---------------------------------------------------------------- location gate
-// The map is only shown once the device gives a position. Until then a full-screen card explains
-// what is needed, re-asks from a tap (iOS only re-prompts from a user gesture) and, if location is
-// blocked, gives the exact settings path.
-let gateOpen = true, gateMode = 'wait';
-function gateState(mode) {
-  if (!gateOpen) return;
-  gateMode = mode;
-  const ios = /iPhone|iPad|iPod/.test(navigator.userAgent) || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
-  const txt = { wait: t('gateText'), denied: ios ? t('gpsDeniedIos') : t('gpsDeniedOther'), nosignal: t('gateText'), nogeo: t('gateNoGeo') }[mode];
-  const st = { wait: t('gateWait'), denied: '', nosignal: t('gateNoSignal'), nogeo: '' }[mode];
-  $('#gateTitle').textContent = mode === 'denied' ? t('gpsDeniedTitle') : t('gateTitle');
-  $('#gateText').textContent = txt;
-  $('#gateStatus').textContent = st; $('#gateStatus').classList.toggle('hidden', !st);
-  $('#btnGate').textContent = mode === 'denied' ? t('retry') : t('gateBtn');
-  $('#btnGate').classList.toggle('hidden', mode === 'nogeo');
-  $('#gate').dataset.mode = mode;
-  $('#btnGateLang').textContent = S.lang === 'en' ? 'PT' : 'EN';
-}
-function closeGate() {
-  if (!gateOpen) return;
-  gateOpen = false;
-  const g = $('#gate'); g.classList.add('gone');
-  setTimeout(() => { g.classList.add('hidden'); map.invalidateSize(); }, 450);
-}
-
 function onPos(p) {
   fix = { lat: p.coords.latitude, lon: p.coords.longitude, acc: p.coords.accuracy, ts: p.timestamp || Date.now() };
-  closeGate();
   gpsDenied = false; $('#gpsBanner').classList.add('hidden');
   meMarker.setLatLng([fix.lat, fix.lon]); meAcc.setLatLng([fix.lat, fix.lon]).setRadius(fix.acc);
   if (!gMe.hasLayer(meMarker)) { gMe.addLayer(meAcc); gMe.addLayer(meMarker); }
@@ -301,7 +269,6 @@ function onPosErr(e) {
   $('#gpsChip .dot').className = 'dot bad';
   const denied = gpsDenied = !!(e && e.code === 1);
   $('#gpsText').textContent = denied ? t('gpsOff') : t('gpsNone');
-  if (gateOpen) return gateState(e === 'no geolocation' ? 'nogeo' : denied ? 'denied' : 'nosignal');
   if (denied && !isDesk()) showGpsHelp();
   else if (!fix) toast(t('gpsUnavail'), 3000);
 }
@@ -1274,7 +1241,6 @@ function applyLang() {
   updateLineBanner(); updateStats();
   if (!fix) $('#gpsText').textContent = t(gpsDenied ? 'gpsOff' : 'gpsWait');
   if (!$('#gpsBanner').classList.contains('hidden')) showGpsHelp();
-  gateState(gateMode);
 }
 // Keyboard (desktop): 1-5 pick a type, Esc closes/cancels, Ctrl/Cmd+Z undoes.
 document.addEventListener('keydown', e => {
@@ -1301,8 +1267,6 @@ function wire() {
   $('#inDecl').oninput = e => { S.decl = parseFloat(e.target.value) || 0; persist(); };
   $('#gpsChip').onclick = () => fix ? map.setView([fix.lat, fix.lon], Math.max(map.getZoom(), 17)) : restartGps();
   $('#btnGpsRetry').onclick = restartGps;
-  $('#btnGate').onclick = () => { gateState('wait'); restartGps(); };
-  $('#btnGateLang').onclick = () => $('#btnLang').click();
   $('#btnGpsClose').onclick = () => $('#gpsBanner').classList.add('hidden');
   $('#btnLocate').onclick = () => !fix ? toast(t('noFix')) : is3d ? map3d.easeTo({ center: [fix.lon, fix.lat], zoom: Math.max(map3d.getZoom(), 16) }) : map.setView([fix.lat, fix.lon], Math.max(map.getZoom(), 17));
   $('#btn3d').onclick = toggle3d;
@@ -1354,7 +1318,6 @@ function wire() {
   if (isDesk()) L.control.zoom({ position: 'bottomright' }).addTo(map);
   if (S.features.length) map.fitBounds(L.featureGroup([...markerById.values()]).getBounds(), { padding: [40, 40], maxZoom: 17 });
   else if (farmPolys) map.fitBounds(L.geoJSON(S.farmGeo).getBounds());
-  gateState('wait');
   startGps();
   if ('serviceWorker' in navigator && location.protocol === 'https:') navigator.serviceWorker.register('sw.js').catch(() => {});
 })();
