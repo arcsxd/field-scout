@@ -189,7 +189,8 @@ const deskMQ = window.matchMedia ? matchMedia('(min-width: 900px) and (pointer: 
 const isDesk = () => deskMQ.matches;
 
 // ---------------------------------------------------------------- map
-const map = L.map('map', { zoomControl: false, attributionControl: true, maxZoom: 21 }).setView([-12.15, -45.0], 13);
+// Start view before the first GPS fix (or without GPS): São Paulo.
+const map = L.map('map', { zoomControl: false, attributionControl: true, maxZoom: 21 }).setView([-23.5505, -46.6333], 12);
 
 // Tile layer that caches every tile you view in IndexedDB (for no-signal areas)
 const CachedLayer = L.TileLayer.extend({
@@ -1323,4 +1324,4 @@ function wire() {
 })();
 
 // expose for tests
-window.__scout = { S, buildKml, computeAvg, zoneOf, map3d: () => map3d };
+window.__scout = { S, buildKml, computeAvg, zoneOf, map, map3d: () => map3d };
